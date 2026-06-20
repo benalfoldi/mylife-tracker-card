@@ -1,17 +1,10 @@
 /**
- * MyLife Tracker Lovelace card v1.3 — themed compact table
+ * MyLife Tracker Lovelace card v1.4 — shadow DOM + brand theme
  */
-const MLTC_VERSION = "1.3.0";
-const MLTC_STYLE_ID = "mylife-tracker-card-styles-v4";
-
-const MLTC_LOGO_SVG = `<svg viewBox="0 0 100 100" width="18" height="18" aria-hidden="true">
-  <defs><linearGradient id="mlg" x1="15" y1="15" x2="85" y2="85"><stop offset="0%" stop-color="#14b8a6"/><stop offset="100%" stop-color="#1e3a8a"/></linearGradient></defs>
-  <path d="M50 14L16 44H30V84H70V44H84L50 14Z" stroke="url(#mlg)" stroke-width="8" stroke-linejoin="round" fill="none"/>
-  <path d="M50 72V42M50 42L36 56M50 42L64 56" stroke="url(#mlg)" stroke-width="8" stroke-linecap="round"/>
-</svg>`;
+const MLTC_VERSION = "1.4.0";
 
 const MLTC_BILL_COLS = {
-  type: { label: "Típus", w: "24%" },
+  type: { label: "Típus", w: "18%", chip: true },
   household: { label: "HH", w: "12%" },
   period: { label: "Időszak", w: "14%" },
   due_date: { label: "Határidő", w: "16%" },
@@ -20,8 +13,8 @@ const MLTC_BILL_COLS = {
 };
 
 const MLTC_EXTRA_COLS = {
-  description: { label: "Leírás", w: "34%" },
-  type: { label: "Típus", w: "12%" },
+  description: { label: "Leírás", w: "32%" },
+  type: { label: "Típus", w: "14%", chip: true },
   household: { label: "HH", w: "10%" },
   period: { label: "Időszak", w: "12%" },
   due_date: { label: "Határidő", w: "14%" },
@@ -31,10 +24,21 @@ const MLTC_EXTRA_COLS = {
 const MLTC_DOC_COLS = {
   name: { label: "Név", w: "30%" },
   person: { label: "Személy", w: "16%" },
-  type: { label: "Típus", w: "14%" },
+  type: { label: "Típus", w: "14%", chip: true },
   date: { label: "Lejárat", w: "16%" },
   days: { label: "Nap", w: "10%", num: true },
 };
+
+function mltcLogoSvg() {
+  const id = "mlg" + Math.random().toString(36).slice(2, 8);
+  return `<svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+    <defs><linearGradient id="${id}" x1="15" y1="15" x2="85" y2="85">
+      <stop offset="0%" stop-color="#14b8a6"/><stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient></defs>
+    <path d="M50 14L16 44H30V84H70V44H84L50 14Z" stroke="url(#${id})" stroke-width="8" stroke-linejoin="round" fill="none"/>
+    <path d="M50 72V42M50 42L36 56M50 42L64 56" stroke="url(#${id})" stroke-width="8" stroke-linecap="round"/>
+  </svg>`;
+}
 
 function mltcIsDark(hass) {
   try {
@@ -45,157 +49,133 @@ function mltcIsDark(hass) {
   return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
 }
 
-function mltcEnsureStyles() {
-  let el = document.getElementById(MLTC_STYLE_ID);
-  if (!el) {
-    el = document.createElement("style");
-    el.id = MLTC_STYLE_ID;
-    document.head.appendChild(el);
-  }
-  el.textContent = `
-    mylife-tracker-card { display: block; }
-    mylife-tracker-card ha-card {
-      --ha-card-border-width: 0px;
-      --ha-card-box-shadow: 0 2px 8px rgba(11,19,43,.12);
+function mltcStyles(dark, theme) {
+  const isBrand = theme !== "ha";
+  return `
+    :host { display: block; }
+    * { box-sizing: border-box; }
+    ha-card {
+      display: block;
       overflow: hidden;
-      border-radius: 12px;
+      border-radius: 14px;
+      --ha-card-border-width: 0px;
+      --ha-card-box-shadow: 0 4px 18px rgba(11,19,43,${dark ? ".55" : ".14"});
     }
+    .card {
+      --navy: #0b132b;
+      --navy2: #102a43;
+      --teal: #10b981;
+      --teal-bg: #ecfdf5;
+      --ios: #007ba7;
+      --blue: #1a6fd4;
+      --amber: #d97706;
+      --red: #dc2626;
+      --bg: ${dark ? "#161b22" : "#ffffff"};
+      --bg2: ${dark ? "#1c2230" : "#f8fafc"};
+      --bg3: ${dark ? "#232d3f" : "#f0fdfa"};
+      --text: ${dark ? "#e6edf3" : "#1e293b"};
+      --muted: ${dark ? "#8b949e" : "#64748b"};
+      --line: ${dark ? "rgba(255,255,255,.1)" : "rgba(15,23,42,.08)"};
+      font: 12px/1.3 'Segoe UI', Roboto, system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .hdr {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 12px 14px;
+      background: ${isBrand
+    ? "linear-gradient(135deg, var(--navy) 0%, var(--navy2) 100%)"
+    : "var(--bg2)"};
+      color: ${isBrand ? "#fff" : "var(--text)"};
+      border-bottom: 1px solid ${isBrand ? "rgba(255,255,255,.1)" : "var(--line)"};
+    }
+    .hdr-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .logo {
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: ${isBrand ? "rgba(255,255,255,.1)" : "var(--bg3)"};
+      border: 1px solid ${isBrand ? "rgba(255,255,255,.15)" : "var(--line)"};
+    }
+    .title { font-size: 14px; font-weight: 700; letter-spacing: .01em; }
+    .sub { font-size: 10px; opacity: .65; margin-top: 2px; }
+    .stats { display: flex; gap: 6px; flex-shrink: 0; }
+    .stat {
+      display: flex; flex-direction: column; align-items: center;
+      min-width: 34px; padding: 4px 8px; border-radius: 10px;
+      background: ${isBrand ? "rgba(255,255,255,.12)" : "var(--bg2)"};
+      border: 1px solid ${isBrand ? "rgba(255,255,255,.1)" : "var(--line)"};
+    }
+    .stat-val { font-size: 13px; font-weight: 800; line-height: 1; }
+    .stat-lbl { font-size: 8px; text-transform: uppercase; opacity: .7; margin-top: 2px; letter-spacing: .04em; }
+    .stat--on .stat-val { color: ${isBrand ? "#34d399" : "var(--teal)"}; }
+    .stat--doc .stat-val { color: var(--amber); }
+    .stat--pay .stat-val { color: var(--red); }
+    .stat--z { opacity: .35; }
 
-    /* Brand tokens (MyLife app) */
-    .mltc {
-      --mltc-navy: #0b132b;
-      --mltc-navy-mid: #0d1b2a;
-      --mltc-teal: #10b981;
-      --mltc-teal-lt: #34d399;
-      --mltc-ios: #007ba7;
-      --mltc-blue: #1a6fd4;
-      --mltc-amber: #d97706;
-      --mltc-red: #dc2626;
-      --mltc-surface: var(--card-background-color, var(--ha-card-background, #fff));
-      --mltc-surface2: var(--secondary-background-color, #f8fafc);
-      --mltc-text: var(--primary-text-color, #1e293b);
-      --mltc-muted: var(--secondary-text-color, #64748b);
-      --mltc-border: var(--divider-color, rgba(15,23,42,.1));
-      font: 0.72rem/1.2 var(--ha-font-family, 'Segoe UI', Roboto, sans-serif);
-      color: var(--mltc-text);
-      background: var(--mltc-surface);
+    .body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 8px; }
+    .panel {
+      border: 1px solid var(--line); border-radius: 10px;
+      overflow: hidden; background: var(--bg2);
     }
-    .mltc--dark {
-      --mltc-surface2: var(--secondary-background-color, #1c2230);
-      --ha-card-box-shadow: 0 2px 12px rgba(0,0,0,.45);
+    .panel-h {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 10px; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+      background: ${dark ? "rgba(255,255,255,.04)" : "rgba(16,185,129,.06)"};
+      border-bottom: 1px solid var(--line);
+      border-left: 3px solid var(--accent, var(--teal));
     }
+    .panel-h--extra { --accent: var(--ios); }
+    .panel-h--doc { --accent: var(--amber); }
+    .panel-count {
+      font-size: 10px; font-weight: 800; color: var(--text);
+      background: var(--bg); border: 1px solid var(--line);
+      border-radius: 999px; padding: 1px 8px;
+    }
+    .scroll {
+      max-height: var(--max-h, 120px); overflow: auto;
+    }
+    .scroll::-webkit-scrollbar { width: 5px; }
+    .scroll::-webkit-scrollbar-thumb { background: var(--teal); border-radius: 4px; }
 
-    /* ── Brand header (matches app nav) ── */
-    .mltc--brand .mltc-bar {
-      background: linear-gradient(135deg, var(--mltc-navy) 0%, var(--mltc-navy-mid) 100%);
-      border-bottom: 1px solid rgba(255,255,255,.08);
-      color: #e6edf3;
-      box-shadow: 0 2px 8px rgba(11,19,43,.25);
-    }
-    .mltc--brand .mltc-bar-title { color: #fff; letter-spacing: .01em; }
-    .mltc--brand .mltc-bar-sub { color: rgba(255,255,255,.55); }
-    .mltc--brand .mltc-logo {
-      background: rgba(255,255,255,.08);
-      border: 1px solid rgba(255,255,255,.12);
-    }
-
-    /* ── HA-native header ── */
-    .mltc--ha .mltc-bar {
-      background: var(--mltc-surface2);
-      border-bottom: 1px solid var(--mltc-border);
-    }
-    .mltc--ha .mltc-logo {
-      background: linear-gradient(135deg, rgba(20,184,166,.15), rgba(30,58,138,.12));
-      border: 1px solid var(--mltc-border);
-    }
-
-    .mltc-bar {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      padding: 8px 10px;
-    }
-    .mltc-brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
-    .mltc-logo {
-      width: 30px; height: 30px; border-radius: 8px;
-      display: grid; place-items: center; flex-shrink: 0;
-    }
-    .mltc-bar-title { font-weight: 700; font-size: 0.82rem; line-height: 1.1; }
-    .mltc-bar-sub { font-size: 0.62rem; margin-top: 2px; }
-
-    .mltc-pills { display: flex; gap: 4px; flex-shrink: 0; }
-    .mltc-pill {
-      min-width: 1.3rem; padding: 0 7px; height: 1.3rem; line-height: 1.3rem;
-      border-radius: 999px; font-size: 0.68rem; font-weight: 700; text-align: center;
-    }
-    .mltc-pill--a { background: var(--mltc-teal); color: #fff; }
-    .mltc-pill--d { background: var(--mltc-amber); color: #fff; }
-    .mltc-pill--p { background: var(--mltc-red); color: #fff; }
-    .mltc-pill--z { opacity: .3; background: var(--mltc-border); color: var(--mltc-muted); }
-
-    .mltc-sec { border-bottom: 1px solid var(--mltc-border); }
-    .mltc-sec:last-child { border-bottom: none; }
-    .mltc-sec-h {
-      display: flex; align-items: center; gap: 6px;
-      padding: 5px 10px 3px; font-size: 0.62rem; font-weight: 700;
-      text-transform: uppercase; letter-spacing: .06em;
-      color: var(--mltc-muted);
-      border-left: 3px solid var(--mltc-teal);
-      margin: 6px 8px 0;
-      padding-left: 8px;
-    }
-    .mltc-sec-h--extra { border-left-color: var(--mltc-ios); }
-    .mltc-sec-h--doc { border-left-color: var(--mltc-amber); }
-
-    .mltc-scroll {
-      max-height: var(--mltc-h, 110px); overflow: auto;
-      margin: 0; padding: 2px 6px 6px;
-    }
-    .mltc-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
-    .mltc-scroll::-webkit-scrollbar-thumb {
-      background: var(--mltc-teal); border-radius: 4px; opacity: .5;
-    }
-
-    .mltc-tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    .mltc-tbl th {
-      padding: 3px 6px; font-size: 0.58rem; font-weight: 700;
-      text-transform: uppercase; letter-spacing: .05em;
-      color: var(--mltc-muted);
-      text-align: left;
-      border-bottom: 2px solid var(--mltc-border);
-      background: var(--mltc-surface2);
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th {
+      padding: 5px 8px; font-size: 9px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+      text-align: left; background: var(--bg);
+      border-bottom: 1px solid var(--line);
       position: sticky; top: 0; z-index: 1;
     }
-    .mltc--brand .mltc-tbl th {
-      background: rgba(16,185,129,.06);
-      border-bottom-color: rgba(16,185,129,.2);
-    }
-    .mltc-tbl td {
-      padding: 3px 6px; height: 1.4rem;
+    td {
+      padding: 5px 8px; height: 26px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      border-bottom: 1px solid var(--mltc-border);
-      vertical-align: middle;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle; font-size: 11px;
     }
-    .mltc-tbl tr:last-child td { border-bottom: none; }
-    .mltc-tbl tbody tr:nth-child(even) td { background: rgba(16,185,129,.04); }
-    .mltc--dark .mltc-tbl tbody tr:nth-child(even) td { background: rgba(255,255,255,.03); }
-    .mltc-tbl tbody tr:hover td { background: rgba(16,185,129,.1); }
-    .mltc-tbl .n {
-      text-align: right; font-variant-numeric: tabular-nums;
-      font-weight: 700; color: var(--mltc-blue);
-    }
-    .mltc--dark .mltc-tbl .n { color: #5eb0ff; }
-    .mltc-tbl tr.bad td { color: var(--mltc-red); }
-    .mltc-tbl tr.warn td { color: var(--mltc-amber); }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:nth-child(even) td { background: ${dark ? "rgba(255,255,255,.02)" : "rgba(16,185,129,.03)"}; }
+    tbody tr:hover td { background: ${dark ? "rgba(16,185,129,.12)" : "rgba(16,185,129,.08)"}; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--blue); }
+    tr.bad td { color: var(--red); }
+    tr.warn td { color: var(--amber); }
 
-    .mltc-foot {
-      padding: 2px 10px 6px; font-size: 0.58rem;
-      color: var(--mltc-muted); text-align: right;
+    .chip {
+      display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+      padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600;
+      background: ${dark ? "rgba(16,185,129,.15)" : "var(--teal-bg)"};
+      color: ${dark ? "#34d399" : "#0f6e56"};
+      border: 1px solid ${dark ? "rgba(16,185,129,.25)" : "#a7f3d0"};
     }
-    .mltc-ok {
-      padding: 14px; text-align: center; font-size: 0.75rem;
-      color: var(--mltc-teal); font-weight: 600;
+    .empty {
+      padding: 12px; text-align: center; font-size: 11px; color: var(--muted);
     }
-    .mltc--brand .mltc-ok { background: rgba(16,185,129,.06); }
-    .mltc-err { padding: 10px; color: var(--mltc-red); font-size: 0.75rem; }
+    .ok {
+      margin: 4px 0; padding: 16px; text-align: center; border-radius: 10px;
+      background: ${dark ? "rgba(16,185,129,.1)" : "var(--teal-bg)"};
+      color: var(--teal); font-weight: 600; font-size: 12px;
+    }
+    .more { padding: 4px 10px 6px; font-size: 9px; color: var(--muted); text-align: right; }
+    .err { padding: 14px; color: var(--red); }
   `;
 }
 
@@ -221,7 +201,6 @@ function mltcPeriod(year, month) {
   return `${year}/${String(month).padStart(2, "0")}`;
 }
 
-/** Drop items with billing year strictly before minYear. */
 function mltcFilterYear(items, minYear) {
   const min = Number(minYear) || 2025;
   return (items || []).filter((i) => {
@@ -235,40 +214,51 @@ function mltcCols(all, selected) {
   return keys.filter((k) => all[k]);
 }
 
+function mltcCell(key, val, col) {
+  const v = val ?? "—";
+  if (col.chip && v !== "—") return `<span class="chip">${mltcEsc(v)}</span>`;
+  if (col.num) return `<span class="num">${mltcEsc(v)}</span>`;
+  return mltcEsc(v);
+}
+
 function mltcTable(allCols, selectedCols, rows, rowCls) {
   const cols = mltcCols(allCols, selectedCols);
-  if (!cols.length) return '<div class="mltc-ok">—</div>';
-  if (!rows.length) return '<div class="mltc-ok">—</div>';
+  if (!cols.length || !rows.length) return '<div class="empty">—</div>';
   const th = cols.map((k) => {
     const c = allCols[k];
-    return `<th class="${c.num ? "n" : ""}" style="width:${c.w}">${mltcEsc(c.label)}</th>`;
+    return `<th class="${c.num ? "num" : ""}" style="width:${c.w}">${mltcEsc(c.label)}</th>`;
   }).join("");
   const tr = rows.map((r) => {
     const td = cols.map((k) => {
       const c = allCols[k];
-      return `<td class="${c.num ? "n" : ""}">${mltcEsc(r[k] ?? "—")}</td>`;
+      const cls = c.num ? "num" : "";
+      return `<td class="${cls}">${mltcCell(k, r[k], c)}</td>`;
     }).join("");
-    const cls = rowCls ? rowCls(r) : "";
-    return `<tr class="${cls}">${td}</tr>`;
+    return `<tr class="${rowCls ? rowCls(r) : ""}">${td}</tr>`;
   }).join("");
-  return `<table class="mltc-tbl"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`;
+  return `<table><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`;
 }
 
 class MyLifeTrackerCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+  }
+
   static getStubConfig() {
     return {
       type: "custom:mylife-tracker-card",
       entity: "sensor.mylife_tracker_status",
       min_year: 2025,
       max_rows: 8,
-      max_height: 110,
+      max_height: 120,
       show_header: true,
       show_bills: true,
       show_extra_costs: true,
       show_documents: false,
       theme: "brand",
       bill_columns: ["type", "household", "period", "amount"],
-      extra_columns: ["description", "period", "amount"],
+      extra_columns: ["description", "type", "period", "amount"],
       doc_columns: ["name", "date", "days"],
     };
   }
@@ -279,13 +269,12 @@ class MyLifeTrackerCard extends HTMLElement {
 
   setConfig(config) {
     if (!config.entity) throw new Error("entity required");
-    const defaults = MyLifeTrackerCard.getStubConfig();
+    const d = MyLifeTrackerCard.getStubConfig();
     this._config = {
-      ...defaults,
-      ...config,
-      min_year: Number(config.min_year ?? defaults.min_year) || 2025,
-      max_rows: Number(config.max_rows ?? defaults.max_rows) || 8,
-      max_height: Number(config.max_height ?? defaults.max_height) || 110,
+      ...d, ...config,
+      min_year: Number(config.min_year ?? d.min_year) || 2025,
+      max_rows: Number(config.max_rows ?? d.max_rows) || 8,
+      max_height: Number(config.max_height ?? d.max_height) || 120,
     };
   }
 
@@ -311,7 +300,7 @@ class MyLifeTrackerCard extends HTMLElement {
 
   _extraRow(x) {
     return {
-      description: (x.description || x.type || "—").slice(0, 28),
+      description: (x.description || x.type || "—").slice(0, 32),
       type: x.type || "—",
       household: x.household_id || "—",
       period: mltcPeriod(x.year, x.month),
@@ -323,7 +312,7 @@ class MyLifeTrackerCard extends HTMLElement {
   _docRow(d) {
     const days = Number(d.days);
     return {
-      name: (d.name || d.type || "—").slice(0, 20),
+      name: (d.name || d.type || "—").slice(0, 22),
       person: d.person || "—",
       type: d.type || "—",
       date: d.date || "—",
@@ -332,100 +321,102 @@ class MyLifeTrackerCard extends HTMLElement {
     };
   }
 
-  _sec(title, table, total, max, secClass = "") {
-    const more = total > max ? `<div class="mltc-foot">+${total - max} további</div>` : "";
+  _panel(title, table, total, max, cls = "") {
+    const more = total > max ? `<div class="more">+${total - max} további</div>` : "";
+    const inner = total ? `<div class="scroll">${table}</div>${more}` : '<div class="empty">Nincs tétel</div>';
     return `
-      <div class="mltc-sec">
-        <div class="mltc-sec-h ${secClass}">${mltcEsc(title)} <span style="opacity:.7">(${total})</span></div>
-        <div class="mltc-scroll">${table}</div>
-        ${more}
+      <div class="panel">
+        <div class="panel-h ${cls}">
+          <span>${mltcEsc(title)}</span>
+          <span class="panel-count">${total}</span>
+        </div>
+        ${inner}
       </div>`;
   }
 
   _render() {
-    if (!this._config || !this._hass) return;
-    mltcEnsureStyles();
+    if (!this._config || !this._hass || !this.shadowRoot) return;
 
     const cfg = this._config;
     const st = this._hass.states[cfg.entity];
+    const theme = cfg.theme === "ha" ? "ha" : "brand";
+    const dark = mltcIsDark(this._hass);
+
     if (!st) {
-      this.innerHTML = `<ha-card><div class="mltc-err">Missing: ${mltcEsc(cfg.entity)}</div></ha-card>`;
+      this.shadowRoot.innerHTML = `
+        <style>${mltcStyles(dark, theme)}</style>
+        <ha-card><div class="err">Missing: ${mltcEsc(cfg.entity)}</div></ha-card>`;
       return;
     }
 
     const a = st.attributes || {};
     const minY = Number(cfg.min_year) || 2025;
     const maxR = Number(cfg.max_rows) || 8;
-    const maxH = Number(cfg.max_height) || 110;
+    const maxH = Number(cfg.max_height) || 120;
 
     const bills = mltcFilterYear(a.unpaid_bills || [], minY);
     const extra = mltcFilterYear(a.unpaid_extra_costs || [], minY);
     const docs = [...(a.expired_docs || []), ...(a.warning_docs || [])];
-
     const payN = bills.length + extra.length;
     const docN = docs.length;
     const totalN = payN + docN;
 
-    const pill = (n, on, cls) =>
-      `<span class="mltc-pill ${n ? cls : "mltc-pill--z"}">${n}</span>`;
+    const stat = (val, lbl, cls) =>
+      `<div class="stat ${val ? cls : "stat--z"}"><span class="stat-val">${val}</span><span class="stat-lbl">${lbl}</span></div>`;
+
+    const hdr = cfg.show_header !== false ? `
+      <div class="hdr">
+        <div class="hdr-left">
+          <div class="logo">${mltcLogoSvg()}</div>
+          <div>
+            <div class="title">MyLife Tracker</div>
+            <div class="sub">≥ ${minY} · v${MLTC_VERSION}</div>
+          </div>
+        </div>
+        <div class="stats">
+          ${stat(totalN, "Össz", "stat--on")}
+          ${stat(docN, "Okm", "stat--doc")}
+          ${stat(payN, "Fiz", "stat--pay")}
+        </div>
+      </div>` : "";
 
     const parts = [];
     if (cfg.show_bills !== false) {
-      parts.push(this._sec(
+      parts.push(this._panel(
         "Számlák",
         mltcTable(MLTC_BILL_COLS, cfg.bill_columns, bills.slice(0, maxR).map((b) => this._billRow(b))),
-        bills.length,
-        maxR,
-        ""
+        bills.length, maxR
       ));
     }
     if (cfg.show_extra_costs !== false) {
-      parts.push(this._sec(
+      parts.push(this._panel(
         "Extra költségek",
         mltcTable(MLTC_EXTRA_COLS, cfg.extra_columns, extra.slice(0, maxR).map((x) => this._extraRow(x))),
-        extra.length,
-        maxR,
-        "mltc-sec-h--extra"
+        extra.length, maxR, "panel-h--extra"
       ));
     }
     if (cfg.show_documents !== false) {
-      parts.push(this._sec(
+      parts.push(this._panel(
         "Okmányok",
         mltcTable(MLTC_DOC_COLS, cfg.doc_columns, docs.slice(0, maxR).map((d) => this._docRow(d)), (r) =>
           r._days < 0 ? "bad" : r._days <= 60 ? "warn" : ""
         ),
-        docs.length,
-        maxR,
-        "mltc-sec-h--doc"
+        docs.length, maxR, "panel-h--doc"
       ));
     }
 
-    const theme = cfg.theme === "ha" ? "ha" : "brand";
-    const dark = mltcIsDark(this._hass) ? " mltc--dark" : "";
+    const hasData = bills.length || extra.length || docs.length;
+    const body = hasData
+      ? `<div class="body">${parts.join("")}</div>`
+      : `<div class="ok">✓ Minden rendben</div>`;
 
-    const hdr = cfg.show_header !== false ? `
-      <div class="mltc-bar">
-        <div class="mltc-brand">
-          <div class="mltc-logo">${MLTC_LOGO_SVG}</div>
-          <div>
-            <div class="mltc-bar-title">MyLife Tracker</div>
-            <div class="mltc-bar-sub">≥ ${minY} · v${MLTC_VERSION}</div>
-          </div>
-        </div>
-        <div class="mltc-pills">
-          ${pill(totalN, totalN > 0, "mltc-pill--a")}
-          ${pill(docN, docN > 0, "mltc-pill--d")}
-          ${pill(payN, payN > 0, "mltc-pill--p")}
-        </div>
-      </div>` : "";
-
-    const body = parts.length && (bills.length || extra.length || docs.length)
-      ? parts.join("")
-      : '<div class="mltc-ok">✓ Nincs függő tétel</div>';
-
-    this.innerHTML = `
+    this.shadowRoot.innerHTML = `
+      <style>${mltcStyles(dark, theme)}</style>
       <ha-card>
-        <div class="mltc mltc--${theme}${dark}" style="--mltc-h:${maxH}px">${hdr}${body}</div>
+        <div class="card" style="--max-h:${maxH}px">
+          ${hdr}
+          ${body}
+        </div>
       </ha-card>`;
   }
 }
@@ -440,41 +431,36 @@ class MyLifeTrackerCardEditor extends HTMLElement {
     this._hass = hass;
   }
 
-  _emit() {
+  _set(key, val) {
+    this._config = { ...this._config, [key]: val };
     this.dispatchEvent(new CustomEvent("config-changed", {
       detail: { config: this._config }, bubbles: true, composed: true,
     }));
   }
 
-  _set(key, val) {
-    this._config = { ...this._config, [key]: val };
-    this._emit();
-  }
-
   _colBox(title, prefix, allCols, selected) {
     const sel = new Set(selected || []);
-    const boxes = Object.entries(allCols).map(([k, c]) =>
-      `<label style="display:block;font-size:11px;margin:2px 0">
-        <input type="checkbox" data-p="${prefix}" data-k="${k}" ${sel.has(k) ? "checked" : ""}/> ${mltcEsc(c.label)}
-      </label>`
-    ).join("");
-    return `<fieldset style="margin:0;padding:6px 8px;border:1px solid var(--divider-color,#ddd)">
-      <legend style="font-size:11px">${mltcEsc(title)}</legend>${boxes}</fieldset>`;
+    return `<fieldset style="margin:0;padding:6px 8px;border:1px solid #ccc">
+      <legend style="font-size:11px">${mltcEsc(title)}</legend>
+      ${Object.entries(allCols).map(([k, c]) =>
+    `<label style="display:block;font-size:11px;margin:2px 0">
+          <input type="checkbox" data-p="${prefix}" data-k="${k}" ${sel.has(k) ? "checked" : ""}/> ${mltcEsc(c.label)}
+        </label>`
+  ).join("")}
+    </fieldset>`;
   }
 
   _render() {
     const c = this._config;
+    if (!c) return;
     this.innerHTML = `
       <div style="padding:10px;display:flex;flex-direction:column;gap:8px;font-size:12px">
-        <div style="font-weight:700;color:var(--primary-color)">MyLife card v${MLTC_VERSION}</div>
-        <label>Theme
-          <select class="theme" style="width:100%;margin-top:2px">
-            <option value="brand">MyLife brand (navy + teal)</option>
-            <option value="ha">Home Assistant native</option>
-          </select>
-        </label>
+        <div style="font-weight:700;color:#10b981">MyLife card v${MLTC_VERSION} (shadow DOM)</div>
+        <label>Theme<select class="theme" style="width:100%;margin-top:2px">
+          <option value="brand">MyLife brand</option><option value="ha">HA native</option>
+        </select></label>
         <label>Entity<input class="e" style="width:100%;margin-top:2px"/></label>
-        <label>Min year (hide older)<input class="y" type="number" style="width:100%;margin-top:2px"/></label>
+        <label>Min year<input class="y" type="number" style="width:100%;margin-top:2px"/></label>
         <label>Max rows<input class="r" type="number" min="3" max="30" style="width:100%;margin-top:2px"/></label>
         <label>Max height px<input class="h" type="number" min="60" max="300" style="width:100%;margin-top:2px"/></label>
         <label><input class="hdr" type="checkbox"/> Header</label>
@@ -491,7 +477,7 @@ class MyLifeTrackerCardEditor extends HTMLElement {
     q(".theme").value = c.theme === "ha" ? "ha" : "brand";
     q(".y").value = c.min_year ?? 2025;
     q(".r").value = c.max_rows ?? 8;
-    q(".h").value = c.max_height ?? 110;
+    q(".h").value = c.max_height ?? 120;
     q(".hdr").checked = c.show_header !== false;
     q(".sb").checked = c.show_bills !== false;
     q(".se").checked = c.show_extra_costs !== false;
@@ -501,7 +487,7 @@ class MyLifeTrackerCardEditor extends HTMLElement {
     q(".theme").onchange = (e) => this._set("theme", e.target.value);
     q(".y").onchange = (e) => this._set("min_year", Number(e.target.value) || 2025);
     q(".r").onchange = (e) => this._set("max_rows", Number(e.target.value) || 8);
-    q(".h").onchange = (e) => this._set("max_height", Number(e.target.value) || 110);
+    q(".h").onchange = (e) => this._set("max_height", Number(e.target.value) || 120);
     q(".hdr").onchange = (e) => this._set("show_header", e.target.checked);
     q(".sb").onchange = (e) => this._set("show_bills", e.target.checked);
     q(".se").onchange = (e) => this._set("show_extra_costs", e.target.checked);
@@ -528,7 +514,7 @@ window.customCards = window.customCards.filter((c) => c.type !== "mylife-tracker
 window.customCards.push({
   type: "mylife-tracker-card",
   name: `MyLife Tracker Card v${MLTC_VERSION}`,
-  description: "Compact table — bills, extra costs, documents",
+  description: "Branded table card with shadow DOM styling",
   preview: true,
   version: MLTC_VERSION,
 });
