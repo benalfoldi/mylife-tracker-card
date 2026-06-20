@@ -1,6 +1,8 @@
 # MyLife Tracker Card
 
-Compact **table** Lovelace card for the [MyLife Tracker integration](../home-assistant/).
+Compact **table** Lovelace card for the [MyLife Tracker Home Assistant integration](https://github.com/benalfoldi/mylife-tracker-home-assistant).
+
+Requires the integration to be installed and configured with *your* MyLife Tracker server URL and API key.
 
 ## Install via HACS
 
@@ -17,10 +19,9 @@ theme: brand
 min_year: 2025
 max_rows: 8
 max_height: 120
-show_header: true
 show_bills: true
-show_extra_costs: false
-show_documents: true
+show_extra_costs: true
+show_documents: false
 bill_columns:
   - type
   - household
@@ -30,40 +31,27 @@ extra_columns:
   - description
   - period
   - amount
-doc_columns:
-  - name
-  - date
-  - days
 ```
 
 ## Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `entity` | required | Status sensor |
+| `entity` | required | Status sensor from the integration |
 | `theme` | `brand` | `brand` = MyLife navy/teal; `ha` = native HA colors |
-| `min_year` | `2025` | Hide items with billing year before this (client-side filter) |
-| `max_rows` | `10` | Rows per section |
-| `max_height` | `140` | Scroll area height (px) |
-| `show_header` | `true` | Compact title + badge pills |
-| `show_bills` / `show_extra_costs` / `show_documents` | `true` | Toggle sections |
-| `bill_columns` | type, household, period, amount | Pick columns (UI editor has checkboxes) |
-| `extra_columns` | description, period, amount | Extra cost columns |
-| `doc_columns` | name, date, days | Document columns |
+| `min_year` | `2025` | Hide items with billing year before this |
+| `max_rows` | `8` | Rows per section |
+| `max_height` | `120` | Scroll area height (px) |
+| `bill_columns` / `extra_columns` / `doc_columns` | see example | Customize table columns (UI editor) |
 
-### Bill column keys
+### Column keys
 
-`type`, `household`, `period`, `due_date`, `amount`, `note`
+**Bills:** `type`, `household`, `period`, `due_date`, `amount`, `note`
 
-### Extra column keys
+**Extra costs:** `description`, `type`, `household`, `period`, `due_date`, `amount`
 
-`description`, `type`, `household`, `period`, `due_date`, `amount`
-
-### Document column keys
-
-`name`, `person`, `type`, `date`, `days`
+**Documents:** `name`, `person`, `type`, `date`, `days`
 
 ## Requires
 
-- [MyLife Tracker integration](../home-assistant/)
-- Server `ha_status.py` deployed (filters unpaid items to year ≥ 2025 for API/badge counts)
+- [MyLife Tracker integration](https://github.com/benalfoldi/mylife-tracker-home-assistant) installed in Home Assistant
