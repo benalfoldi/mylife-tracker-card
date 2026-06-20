@@ -1,217 +1,146 @@
 /**
- * MyLife Tracker Lovelace card
+ * MyLife Tracker Lovelace card — compact table layout
  */
-const MLTC_STYLE_ID = "mylife-tracker-card-styles";
+const MLTC_STYLE_ID = "mylife-tracker-card-styles-v2";
+
+const MLTC_BILL_COLS = {
+  type: { label: "Típus", width: "22%" },
+  household: { label: "HH", width: "14%" },
+  period: { label: "Időszak", width: "14%" },
+  due_date: { label: "Határidő", width: "16%" },
+  amount: { label: "Összeg", width: "18%", align: "right" },
+  note: { label: "Megjegyzés", width: "28%" },
+};
+
+const MLTC_EXTRA_COLS = {
+  description: { label: "Leírás", width: "30%" },
+  type: { label: "Típus", width: "14%" },
+  household: { label: "HH", width: "12%" },
+  period: { label: "Időszak", width: "14%" },
+  due_date: { label: "Határidő", width: "14%" },
+  amount: { label: "Összeg", width: "16%", align: "right" },
+};
+
+const MLTC_DOC_COLS = {
+  name: { label: "Név", width: "28%" },
+  person: { label: "Személy", width: "18%" },
+  type: { label: "Típus", width: "14%" },
+  date: { label: "Lejárat", width: "16%" },
+  days: { label: "Nap", width: "10%", align: "right" },
+};
 
 function mltcEnsureStyles() {
-  if (document.getElementById(MLTC_STYLE_ID)) return;
-  const style = document.createElement("style");
-  style.id = MLTC_STYLE_ID;
+  let style = document.getElementById(MLTC_STYLE_ID);
+  if (!style) {
+    style = document.createElement("style");
+    style.id = MLTC_STYLE_ID;
+    document.head.appendChild(style);
+  }
   style.textContent = `
-    mylife-tracker-card {
-      display: block;
-    }
-    .mltc-wrap {
-      padding: 0;
-      overflow: hidden;
-    }
-    .mltc-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 16px 16px 10px;
-      background: linear-gradient(135deg, rgba(20,184,166,.14), rgba(30,58,138,.10));
-      border-bottom: 1px solid rgba(var(--rgb-primary-text-color, 0,0,0), .08);
-    }
-    .mltc-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-width: 0;
-    }
-    .mltc-logo {
-      width: 34px;
-      height: 34px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #14b8a6, #1e3a8a);
-      color: #fff;
-      display: grid;
-      place-items: center;
-      font-size: 18px;
-      flex-shrink: 0;
-    }
-    .mltc-title {
-      font-size: 1.05rem;
-      font-weight: 700;
-      line-height: 1.2;
-    }
-    .mltc-updated {
-      font-size: 0.72rem;
-      opacity: 0.65;
-      margin-top: 2px;
-    }
-    .mltc-chips {
-      display: flex;
-      gap: 6px;
-      flex-shrink: 0;
-    }
-    .mltc-chip {
-      min-width: 2rem;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 0.82rem;
-      font-weight: 700;
-      text-align: center;
-      line-height: 1.2;
-    }
-    .mltc-chip--total {
-      background: var(--primary-color);
-      color: var(--text-primary-color, #fff);
-    }
-    .mltc-chip--docs {
-      background: #d97706;
-      color: #fff;
-    }
-    .mltc-chip--pay {
-      background: #dc2626;
-      color: #fff;
-    }
-    .mltc-chip--zero {
-      opacity: 0.45;
-      background: var(--secondary-background-color);
-      color: var(--primary-text-color);
-    }
-    .mltc-body {
-      padding: 8px 12px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .mltc-section {
-      border: 1px solid rgba(var(--rgb-primary-text-color, 0,0,0), .08);
-      border-radius: 14px;
-      overflow: hidden;
-      background: var(--card-background-color, var(--ha-card-background, var(--secondary-background-color)));
-    }
-    .mltc-section-hdr {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      padding: 10px 12px;
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
+    mylife-tracker-card { display: block; }
+    .mltc { font-size: 0.78rem; line-height: 1.25; }
+    .mltc-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 8px 10px; border-bottom: 1px solid rgba(128,128,128,.2);
       background: var(--secondary-background-color);
     }
-    .mltc-section-count {
-      font-size: 0.75rem;
-      opacity: 0.7;
-      font-weight: 600;
-      text-transform: none;
-      letter-spacing: 0;
+    .mltc-bar-title { font-weight: 700; font-size: 0.82rem; white-space: nowrap; }
+    .mltc-bar-meta { font-size: 0.68rem; opacity: .65; }
+    .mltc-pills { display: flex; gap: 4px; flex-shrink: 0; }
+    .mltc-pill {
+      min-width: 1.4rem; padding: 1px 7px; border-radius: 999px;
+      font-size: 0.72rem; font-weight: 700; text-align: center;
     }
-    .mltc-list {
-      max-height: 220px;
-      overflow-y: auto;
-      padding: 6px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+    .mltc-pill--on { background: var(--primary-color); color: var(--text-primary-color,#fff); }
+    .mltc-pill--off { background: var(--divider-color, rgba(128,128,128,.25)); opacity: .55; }
+    .mltc-pill--warn { background: #d97706; color: #fff; }
+    .mltc-pill--bad { background: #dc2626; color: #fff; }
+    .mltc-block { padding: 6px 8px 8px; }
+    .mltc-block + .mltc-block { border-top: 1px solid rgba(128,128,128,.15); }
+    .mltc-block-title {
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .04em; opacity: .75; margin: 0 0 4px 2px;
     }
-    .mltc-row {
-      display: grid;
-      grid-template-columns: 36px 1fr auto;
-      gap: 10px;
-      align-items: center;
-      padding: 10px;
-      border-radius: 12px;
-      background: var(--secondary-background-color);
+    .mltc-scroll { max-height: var(--mltc-max-h, 140px); overflow: auto; }
+    .mltc-table {
+      width: 100%; border-collapse: collapse; table-layout: fixed;
     }
-    .mltc-row--warn { box-shadow: inset 3px 0 0 #d97706; }
-    .mltc-row--bad { box-shadow: inset 3px 0 0 #dc2626; }
-    .mltc-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      display: grid;
-      place-items: center;
-      font-size: 1rem;
-      background: rgba(var(--rgb-primary-color, 3,169,244), .12);
+    .mltc-table th, .mltc-table td {
+      padding: 3px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      border-bottom: 1px solid rgba(128,128,128,.12);
     }
-    .mltc-main { min-width: 0; }
-    .mltc-name {
-      font-weight: 650;
-      font-size: 0.92rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    .mltc-table th {
+      font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .03em; opacity: .7; text-align: left;
+      position: sticky; top: 0; background: var(--card-background-color, var(--ha-card-background, #fff));
+      z-index: 1;
     }
-    .mltc-meta {
-      font-size: 0.76rem;
-      opacity: 0.72;
-      margin-top: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .mltc-amt {
-      font-weight: 700;
-      font-size: 0.86rem;
-      white-space: nowrap;
-      text-align: right;
-    }
-    .mltc-empty {
-      padding: 14px 12px;
-      text-align: center;
-      font-size: 0.85rem;
-      opacity: 0.7;
-    }
-    .mltc-more {
-      padding: 0 12px 10px;
-      font-size: 0.76rem;
-      opacity: 0.65;
-      text-align: center;
-    }
-    .mltc-all-clear {
-      padding: 28px 16px;
-      text-align: center;
-    }
-    .mltc-all-clear-icon {
-      font-size: 2rem;
-      margin-bottom: 8px;
-    }
-    .mltc-error {
-      padding: 16px;
-      color: var(--error-color, #b91c1c);
-      font-size: 0.9rem;
-    }
+    .mltc-table tr:last-child td { border-bottom: none; }
+    .mltc-table tr:nth-child(even) td { background: rgba(128,128,128,.06); }
+    .mltc-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .mltc-table .warn td { color: #d97706; }
+    .mltc-table .bad td { color: #dc2626; font-weight: 600; }
+    .mltc-empty { padding: 10px; text-align: center; opacity: .65; font-size: 0.76rem; }
+    .mltc-more { text-align: center; font-size: 0.68rem; opacity: .6; padding-top: 3px; }
+    .mltc-ok { padding: 14px; text-align: center; opacity: .75; font-size: 0.8rem; }
+    .mltc-err { padding: 12px; color: var(--error-color,#c62828); }
   `;
-  document.head.appendChild(style);
 }
 
-function mltcEsc(text) {
-  return String(text ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+function mltcEsc(t) {
+  return String(t ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function mltcBillIcon(type) {
-  const map = {
-    gaz: "🔥",
-    viz: "💧",
-    villany: "⚡",
-    internet: "🌐",
-    mobilok: "📱",
-    szemét: "🗑️",
-    kozos: "🏢",
-  };
-  const key = String(type || "").toLowerCase();
-  return map[key] || "🧾";
+function mltcMoney(amount, currency) {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return "—";
+  try {
+    return new Intl.NumberFormat("hu-HU", {
+      style: "currency", currency: currency || "HUF", maximumFractionDigits: 0,
+    }).format(n);
+  } catch (_e) {
+    return `${n.toLocaleString("hu-HU")} ${currency || "HUF"}`;
+  }
+}
+
+function mltcPeriod(year, month) {
+  if (!year || !month) return "—";
+  return `${year}/${String(month).padStart(2, "0")}`;
+}
+
+function mltcFilterYear(items, minYear) {
+  const y = Number(minYear) || 2025;
+  return (items || []).filter((i) => {
+    const yr = Number(i.year);
+    return !Number.isFinite(yr) || yr >= y;
+  });
+}
+
+function mltcPickCols(allCols, selected) {
+  const keys = Array.isArray(selected) && selected.length ? selected : Object.keys(allCols);
+  return keys.filter((k) => allCols[k]);
+}
+
+function mltcTable(allCols, selectedCols, rows, rowClassFn) {
+  const cols = mltcPickCols(allCols, selectedCols);
+  if (!cols.length) return '<div class="mltc-empty">Nincs oszlop beállítva</div>';
+  if (!rows.length) return '<div class="mltc-empty">—</div>';
+  const head = cols.map((k) => {
+    const c = allCols[k];
+    const cls = c.align === "right" ? " num" : "";
+    return `<th class="${cls.trim()}" style="width:${c.width}">${mltcEsc(c.label)}</th>`;
+  }).join("");
+  const body = rows.map((r) => {
+    const cls = rowClassFn ? rowClassFn(r) : "";
+    const tds = cols.map((k) => {
+      const c = allCols[k];
+      const align = c.align === "right" ? " num" : "";
+      return `<td class="${align.trim()}">${mltcEsc(r[k] ?? "—")}</td>`;
+    }).join("");
+    return `<tr class="${cls}">${tds}</tr>`;
+  }).join("");
+  return `<table class="mltc-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
 class MyLifeTrackerCard extends HTMLElement {
@@ -219,7 +148,15 @@ class MyLifeTrackerCard extends HTMLElement {
     return {
       type: "custom:mylife-tracker-card",
       entity: "sensor.mylife_tracker_status",
-      max_items: 8,
+      min_year: 2025,
+      max_rows: 10,
+      show_header: true,
+      show_bills: true,
+      show_extra_costs: true,
+      show_documents: true,
+      bill_columns: ["type", "household", "period", "amount"],
+      extra_columns: ["description", "period", "amount"],
+      doc_columns: ["name", "date", "days"],
     };
   }
 
@@ -229,13 +166,7 @@ class MyLifeTrackerCard extends HTMLElement {
 
   setConfig(config) {
     if (!config.entity) throw new Error("Set entity to sensor.mylife_tracker_status");
-    this._config = {
-      max_items: 8,
-      show_bills: true,
-      show_extra_costs: true,
-      show_documents: true,
-      ...config,
-    };
+    this._config = { ...MyLifeTrackerCard.getStubConfig(), ...config };
   }
 
   set hass(hass) {
@@ -244,61 +175,50 @@ class MyLifeTrackerCard extends HTMLElement {
   }
 
   getCardSize() {
-    return 3;
+    return 2;
   }
 
-  _money(amount, currency) {
-    const n = Number(amount);
-    if (!Number.isFinite(n)) return "—";
-    const cur = currency || "HUF";
-    try {
-      return new Intl.NumberFormat("hu-HU", {
-        style: "currency",
-        currency: cur,
-        maximumFractionDigits: 0,
-      }).format(n);
-    } catch (_e) {
-      return `${n.toLocaleString("hu-HU")} ${cur}`;
-    }
+  _billRow(b) {
+    return {
+      type: b.type || "—",
+      household: b.household_id || "—",
+      period: mltcPeriod(b.year, b.month),
+      due_date: b.due_date || "—",
+      amount: mltcMoney(b.amount, b.currency),
+      note: (b.note || "").slice(0, 40) || "—",
+    };
   }
 
-  _period(year, month) {
-    if (!year || !month) return "";
-    return `${year}. ${String(month).padStart(2, "0")}.`;
+  _extraRow(x) {
+    return {
+      description: (x.description || x.type || "—").slice(0, 32),
+      type: x.type || "—",
+      household: x.household_id || "—",
+      period: mltcPeriod(x.year, x.month),
+      due_date: x.due_date || "—",
+      amount: mltcMoney(x.amount, x.currency),
+    };
   }
 
-  _fmtUpdated(raw) {
-    if (!raw) return "—";
-    try {
-      return new Date(raw).toLocaleString("hu-HU", {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch (_e) {
-      return raw;
-    }
+  _docRow(d) {
+    const days = Number(d.days);
+    return {
+      name: d.name || d.type || "—",
+      person: d.person || "—",
+      type: d.type || "—",
+      date: d.date || "—",
+      days: Number.isFinite(days) ? String(days) : "—",
+      _days: days,
+    };
   }
 
-  _section(title, icon, items, emptyText, maxItems, rowHtml) {
-    if (!items.length) {
-      return `
-        <div class="mltc-section">
-          <div class="mltc-section-hdr"><span>${icon} ${mltcEsc(title)}</span><span class="mltc-section-count">0</span></div>
-          <div class="mltc-empty">${mltcEsc(emptyText)}</div>
-        </div>`;
-    }
-    const shown = items.slice(0, maxItems);
-    const more = items.length - shown.length;
+  _section(title, tableHtml, total, maxRows) {
+    const more = total > maxRows ? `<div class="mltc-more">+${total - maxRows} további</div>` : "";
     return `
-      <div class="mltc-section">
-        <div class="mltc-section-hdr">
-          <span>${icon} ${mltcEsc(title)}</span>
-          <span class="mltc-section-count">${items.length}</span>
-        </div>
-        <div class="mltc-list">${shown.map(rowHtml).join("")}</div>
-        ${more > 0 ? `<div class="mltc-more">+${more} további tétel</div>` : ""}
+      <div class="mltc-block">
+        <div class="mltc-block-title">${mltcEsc(title)} (${total})</div>
+        <div class="mltc-scroll">${tableHtml}</div>
+        ${more}
       </div>`;
   }
 
@@ -306,110 +226,85 @@ class MyLifeTrackerCard extends HTMLElement {
     if (!this._config || !this._hass) return;
     mltcEnsureStyles();
 
-    const state = this._hass.states[this._config.entity];
+    const cfg = this._config;
+    const state = this._hass.states[cfg.entity];
     if (!state) {
-      this.innerHTML = `<ha-card><div class="mltc-error">Entity not found: ${mltcEsc(this._config.entity)}</div></ha-card>`;
+      this.innerHTML = `<ha-card><div class="mltc-err">Entity not found: ${mltcEsc(cfg.entity)}</div></ha-card>`;
       return;
     }
 
     const a = state.attributes || {};
-    const docsBadge = Number(a.docs_badge_count ?? 0);
-    const paymentsBadge = Number(a.payments_badge_count ?? 0);
+    const minYear = Number(cfg.min_year) || 2025;
+    const maxRows = Number(cfg.max_rows) || 10;
+    const maxH = Number(cfg.max_height) || 140;
+
+    const billsAll = mltcFilterYear(a.unpaid_bills || [], minYear);
+    const extraAll = mltcFilterYear(a.unpaid_extra_costs || [], minYear);
+    const docsAll = [...(a.expired_docs || []), ...(a.warning_docs || [])];
+
     const badge = Number(state.state ?? a.badge_count ?? 0);
-    const unpaidBills = a.unpaid_bills || [];
-    const unpaidExtra = a.unpaid_extra_costs || [];
-    const warningDocs = a.warning_docs || [];
-    const expiredDocs = a.expired_docs || [];
-    const maxItems = Number(this._config.max_items) || 8;
+    const docsBadge = Number(a.docs_badge_count ?? 0);
+    const payBadge = Number(a.payments_badge_count ?? 0);
 
-    const chip = (val, cls) =>
-      `<span class="mltc-chip ${cls}${val ? "" : " mltc-chip--zero"}" title="${cls}">${val}</span>`;
+    const pill = (n, cls) =>
+      `<span class="mltc-pill ${n ? cls : "mltc-pill--off"}">${n}</span>`;
 
-    const billSection = this._config.show_bills !== false
-      ? this._section(
-          "Függő számlák",
-          "🧾",
-          unpaidBills,
-          "Nincs függő számla",
-          maxItems,
-          (b) => `
-            <div class="mltc-row">
-              <div class="mltc-icon">${mltcBillIcon(b.type)}</div>
-              <div class="mltc-main">
-                <div class="mltc-name">${mltcEsc(b.type || "számla")} · ${mltcEsc(b.household_id || "")}</div>
-                <div class="mltc-meta">${mltcEsc(this._period(b.year, b.month))}${b.due_date ? ` · határidő ${mltcEsc(b.due_date)}` : ""}</div>
-              </div>
-              <div class="mltc-amt">${mltcEsc(this._money(b.amount, b.currency))}</div>
-            </div>`
-        )
-      : "";
+    const parts = [];
+    if (cfg.show_bills !== false) {
+      const rows = billsAll.slice(0, maxRows).map((b) => this._billRow(b));
+      parts.push(this._section(
+        "Függő számlák",
+        mltcTable(MLTC_BILL_COLS, cfg.bill_columns, rows),
+        billsAll.length,
+        maxRows
+      ));
+    }
+    if (cfg.show_extra_costs !== false) {
+      const rows = extraAll.slice(0, maxRows).map((x) => this._extraRow(x));
+      parts.push(this._section(
+        "Extra költségek",
+        mltcTable(MLTC_EXTRA_COLS, cfg.extra_columns, rows),
+        extraAll.length,
+        maxRows
+      ));
+    }
+    if (cfg.show_documents !== false) {
+      const rows = docsAll.slice(0, maxRows).map((d) => this._docRow(d));
+      parts.push(this._section(
+        "Okmányok",
+        mltcTable(MLTC_DOC_COLS, cfg.doc_columns, rows, (r) =>
+          r._days < 0 ? "bad" : r._days <= 60 ? "warn" : ""
+        ),
+        docsAll.length,
+        maxRows
+      ));
+    }
 
-    const extraSection = this._config.show_extra_costs !== false
-      ? this._section(
-          "Extra költségek",
-          "💳",
-          unpaidExtra,
-          "Nincs függő extra költség",
-          maxItems,
-          (x) => `
-            <div class="mltc-row">
-              <div class="mltc-icon">💳</div>
-              <div class="mltc-main">
-                <div class="mltc-name">${mltcEsc(x.description || x.type || "extra")}</div>
-                <div class="mltc-meta">${mltcEsc(x.household_id || "")} · ${mltcEsc(this._period(x.year, x.month))}</div>
-              </div>
-              <div class="mltc-amt">${mltcEsc(this._money(x.amount, x.currency))}</div>
-            </div>`
-        )
-      : "";
+    const header = cfg.show_header !== false ? `
+      <div class="mltc-bar">
+        <div>
+          <div class="mltc-bar-title">MyLife Tracker</div>
+          <div class="mltc-bar-meta">≥ ${minYear} · ${mltcEsc(
+            new Date(a.last_updated || state.last_changed).toLocaleString("hu-HU", {
+              month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+            })
+          )}</div>
+        </div>
+        <div class="mltc-pills">
+          ${pill(badge, "mltc-pill--on")}
+          ${pill(docsBadge, "mltc-pill--warn")}
+          ${pill(payBadge, "mltc-pill--bad")}
+        </div>
+      </div>` : "";
 
-    const docs = [...expiredDocs, ...warningDocs];
-    const docSection = this._config.show_documents !== false
-      ? this._section(
-          "Okmány figyelmeztetések",
-          "📄",
-          docs,
-          "Nincs lejáró okmány",
-          maxItems,
-          (d) => {
-            const overdue = (d.days ?? 0) < 0;
-            const daysLabel = overdue
-              ? `${Math.abs(d.days)} napja lejárt`
-              : `${d.days} nap van hátra`;
-            return `
-            <div class="mltc-row ${overdue ? "mltc-row--bad" : "mltc-row--warn"}">
-              <div class="mltc-icon">📄</div>
-              <div class="mltc-main">
-                <div class="mltc-name">${mltcEsc(d.name || d.type || "okmány")}</div>
-                <div class="mltc-meta">${mltcEsc(d.person || "")}${d.person ? " · " : ""}${mltcEsc(d.date || "")} · ${mltcEsc(daysLabel)}</div>
-              </div>
-            </div>`;
-          }
-        )
-      : "";
-
-    const hasAlerts = unpaidBills.length || unpaidExtra.length || docs.length;
-    const body = hasAlerts
-      ? `<div class="mltc-body">${billSection}${extraSection}${docSection}</div>`
-      : `<div class="mltc-all-clear"><div class="mltc-all-clear-icon">✅</div><div>Minden rendben — nincs függő tétel.</div></div>`;
+    const body = parts.length
+      ? parts.join("")
+      : '<div class="mltc-ok">✓ Nincs függő tétel</div>';
 
     this.innerHTML = `
       <ha-card>
-        <div class="mltc-wrap">
-          <div class="mltc-header">
-            <div class="mltc-brand">
-              <div class="mltc-logo">🏠</div>
-              <div>
-                <div class="mltc-title">MyLife Tracker</div>
-                <div class="mltc-updated">${mltcEsc(this._fmtUpdated(a.last_updated || state.last_changed))}</div>
-              </div>
-            </div>
-            <div class="mltc-chips">
-              ${chip(badge, "mltc-chip--total")}
-              ${chip(docsBadge, "mltc-chip--docs")}
-              ${chip(paymentsBadge, "mltc-chip--pay")}
-            </div>
-          </div>
+        <div class="mltc" style="--mltc-max-h:${maxH}px">
+          ${header}
           ${body}
         </div>
       </ha-card>
@@ -419,7 +314,7 @@ class MyLifeTrackerCard extends HTMLElement {
 
 class MyLifeTrackerCardEditor extends HTMLElement {
   setConfig(config) {
-    this._config = { max_items: 8, ...config };
+    this._config = { ...MyLifeTrackerCard.getStubConfig(), ...config };
     this._render();
   }
 
@@ -429,43 +324,78 @@ class MyLifeTrackerCardEditor extends HTMLElement {
 
   _update(key, value) {
     this._config = { ...this._config, [key]: value };
-    this.dispatchEvent(
-      new CustomEvent("config-changed", {
-        detail: { config: this._config },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    this.dispatchEvent(new CustomEvent("config-changed", {
+      detail: { config: this._config }, bubbles: true, composed: true,
+    }));
+  }
+
+  _colChecks(prefix, allCols, selected) {
+    const sel = new Set(selected || []);
+    return Object.entries(allCols).map(([k, c]) => `
+      <label style="display:block;font-size:12px;">
+        <input type="checkbox" data-col="${prefix}" data-key="${k}" ${sel.has(k) ? "checked" : ""}/>
+        ${mltcEsc(c.label)} (${k})
+      </label>`).join("");
+  }
+
+  _readCols(prefix) {
+    return [...this.querySelectorAll(`input[data-col="${prefix}"]:checked`)].map((el) => el.dataset.key);
   }
 
   _render() {
-    if (!this._config) return;
+    const c = this._config;
     this.innerHTML = `
-      <div class="card-config" style="padding:12px;display:flex;flex-direction:column;gap:12px;">
-        <label>Status entity<input class="entity" type="text" style="width:100%;margin-top:4px;" /></label>
-        <label>Max items per section<input class="max-items" type="number" min="3" max="30" style="width:100%;margin-top:4px;" /></label>
-        <label><input class="show-bills" type="checkbox" /> Show unpaid bills</label>
-        <label><input class="show-extra" type="checkbox" /> Show unpaid extra costs</label>
-        <label><input class="show-docs" type="checkbox" /> Show document alerts</label>
-      </div>
-    `;
-    const bind = (sel, key, parser = (v) => v) => {
-      const el = this.querySelector(sel);
-      if (!el) return;
-      if (el.type === "checkbox") el.checked = this._config[key] !== false;
-      else el.value = this._config[key] ?? "";
-      el.addEventListener("change", (ev) => {
-        const val = ev.target.type === "checkbox" ? ev.target.checked : parser(ev.target.value);
-        this._update(key, val);
+      <div style="padding:12px;display:flex;flex-direction:column;gap:10px;font-size:13px;">
+        <label>Entity<input class="entity" style="width:100%;margin-top:4px;" /></label>
+        <label>Min year (hide older)<input class="min-year" type="number" style="width:100%;margin-top:4px;" /></label>
+        <label>Max rows per section<input class="max-rows" type="number" min="3" max="50" style="width:100%;margin-top:4px;" /></label>
+        <label>Max height (px)<input class="max-height" type="number" min="80" max="400" style="width:100%;margin-top:4px;" /></label>
+        <label><input class="show-header" type="checkbox"/> Show header bar</label>
+        <label><input class="show-bills" type="checkbox"/> Bills section</label>
+        <fieldset style="border:1px solid #ccc;padding:8px;"><legend>Bill columns</legend>
+          ${this._colChecks("bill", MLTC_BILL_COLS, c.bill_columns)}
+        </fieldset>
+        <label><input class="show-extra" type="checkbox"/> Extra costs section</label>
+        <fieldset style="border:1px solid #ccc;padding:8px;"><legend>Extra columns</legend>
+          ${this._colChecks("extra", MLTC_EXTRA_COLS, c.extra_columns)}
+        </fieldset>
+        <label><input class="show-docs" type="checkbox"/> Documents section</label>
+        <fieldset style="border:1px solid #ccc;padding:8px;"><legend>Document columns</legend>
+          ${this._colChecks("doc", MLTC_DOC_COLS, c.doc_columns)}
+        </fieldset>
+      </div>`;
+
+    const set = (sel, val) => { const el = this.querySelector(sel); if (el) el.value = val; };
+    set(".entity", c.entity || "sensor.mylife_tracker_status");
+    set(".min-year", c.min_year ?? 2025);
+    set(".max-rows", c.max_rows ?? 10);
+    set(".max-height", c.max_height ?? 140);
+    this.querySelector(".show-header").checked = c.show_header !== false;
+    this.querySelector(".show-bills").checked = c.show_bills !== false;
+    this.querySelector(".show-extra").checked = c.show_extra_costs !== false;
+    this.querySelector(".show-docs").checked = c.show_documents !== false;
+
+    const bind = (sel, key, parse = (v) => v) => {
+      this.querySelector(sel)?.addEventListener("change", (ev) => {
+        const v = ev.target.type === "checkbox" ? ev.target.checked : parse(ev.target.value);
+        this._update(key, v);
       });
     };
     bind(".entity", "entity");
-    bind(".max-items", "max_items", (v) => Number(v) || 8);
+    bind(".min-year", "min_year", (v) => Number(v) || 2025);
+    bind(".max-rows", "max_rows", (v) => Number(v) || 10);
+    bind(".max-height", "max_height", (v) => Number(v) || 140);
+    bind(".show-header", "show_header");
     bind(".show-bills", "show_bills");
     bind(".show-extra", "show_extra_costs");
     bind(".show-docs", "show_documents");
-    this.querySelector(".entity").value = this._config.entity || "sensor.mylife_tracker_status";
-    this.querySelector(".max-items").value = this._config.max_items ?? 8;
+
+    ["bill", "extra", "doc"].forEach((prefix) => {
+      const key = `${prefix === "bill" ? "bill" : prefix === "extra" ? "extra" : "doc"}_columns`;
+      this.querySelectorAll(`input[data-col="${prefix}"]`).forEach((el) => {
+        el.addEventListener("change", () => this._update(key, this._readCols(prefix)));
+      });
+    });
   }
 }
 
@@ -475,6 +405,6 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "mylife-tracker-card",
   name: "MyLife Tracker Card",
-  description: "Badges, unpaid bills, and document expiry alerts from MyLife Tracker",
+  description: "Compact table card for MyLife Tracker alerts",
   preview: true,
 });
