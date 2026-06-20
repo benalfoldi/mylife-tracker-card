@@ -13,6 +13,7 @@ Compact **table** Lovelace card for the [MyLife Tracker integration](../home-ass
 ```yaml
 type: custom:mylife-tracker-card
 entity: sensor.mylife_tracker_status
+theme: brand
 min_year: 2025
 max_rows: 8
 max_height: 120
@@ -40,6 +41,7 @@ doc_columns:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `entity` | required | Status sensor |
+| `theme` | `brand` | `brand` = MyLife navy/teal; `ha` = native HA colors |
 | `min_year` | `2025` | Hide items with billing year before this (client-side filter) |
 | `max_rows` | `10` | Rows per section |
 | `max_height` | `140` | Scroll area height (px) |

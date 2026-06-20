@@ -1,8 +1,14 @@
 /**
- * MyLife Tracker Lovelace card v1.2 — compact table
+ * MyLife Tracker Lovelace card v1.3 — themed compact table
  */
-const MLTC_VERSION = "1.2.0";
-const MLTC_STYLE_ID = "mylife-tracker-card-styles-v3";
+const MLTC_VERSION = "1.3.0";
+const MLTC_STYLE_ID = "mylife-tracker-card-styles-v4";
+
+const MLTC_LOGO_SVG = `<svg viewBox="0 0 100 100" width="18" height="18" aria-hidden="true">
+  <defs><linearGradient id="mlg" x1="15" y1="15" x2="85" y2="85"><stop offset="0%" stop-color="#14b8a6"/><stop offset="100%" stop-color="#1e3a8a"/></linearGradient></defs>
+  <path d="M50 14L16 44H30V84H70V44H84L50 14Z" stroke="url(#mlg)" stroke-width="8" stroke-linejoin="round" fill="none"/>
+  <path d="M50 72V42M50 42L36 56M50 42L64 56" stroke="url(#mlg)" stroke-width="8" stroke-linecap="round"/>
+</svg>`;
 
 const MLTC_BILL_COLS = {
   type: { label: "Típus", w: "24%" },
@@ -30,6 +36,15 @@ const MLTC_DOC_COLS = {
   days: { label: "Nap", w: "10%", num: true },
 };
 
+function mltcIsDark(hass) {
+  try {
+    const th = hass?.selectedTheme;
+    if (th && hass.themes?.[th]?.modes?.dark) return true;
+    if (hass.themes?.darkMode) return true;
+  } catch (_e) { /* ignore */ }
+  return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
+}
+
 function mltcEnsureStyles() {
   let el = document.getElementById(MLTC_STYLE_ID);
   if (!el) {
@@ -39,58 +54,148 @@ function mltcEnsureStyles() {
   }
   el.textContent = `
     mylife-tracker-card { display: block; }
-    mylife-tracker-card ha-card { --ha-card-border-width: 0px; }
-    .mltc { font: 0.72rem/1.2 var(--ha-font-family, Roboto, sans-serif); color: var(--primary-text-color); }
+    mylife-tracker-card ha-card {
+      --ha-card-border-width: 0px;
+      --ha-card-box-shadow: 0 2px 8px rgba(11,19,43,.12);
+      overflow: hidden;
+      border-radius: 12px;
+    }
+
+    /* Brand tokens (MyLife app) */
+    .mltc {
+      --mltc-navy: #0b132b;
+      --mltc-navy-mid: #0d1b2a;
+      --mltc-teal: #10b981;
+      --mltc-teal-lt: #34d399;
+      --mltc-ios: #007ba7;
+      --mltc-blue: #1a6fd4;
+      --mltc-amber: #d97706;
+      --mltc-red: #dc2626;
+      --mltc-surface: var(--card-background-color, var(--ha-card-background, #fff));
+      --mltc-surface2: var(--secondary-background-color, #f8fafc);
+      --mltc-text: var(--primary-text-color, #1e293b);
+      --mltc-muted: var(--secondary-text-color, #64748b);
+      --mltc-border: var(--divider-color, rgba(15,23,42,.1));
+      font: 0.72rem/1.2 var(--ha-font-family, 'Segoe UI', Roboto, sans-serif);
+      color: var(--mltc-text);
+      background: var(--mltc-surface);
+    }
+    .mltc--dark {
+      --mltc-surface2: var(--secondary-background-color, #1c2230);
+      --ha-card-box-shadow: 0 2px 12px rgba(0,0,0,.45);
+    }
+
+    /* ── Brand header (matches app nav) ── */
+    .mltc--brand .mltc-bar {
+      background: linear-gradient(135deg, var(--mltc-navy) 0%, var(--mltc-navy-mid) 100%);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      color: #e6edf3;
+      box-shadow: 0 2px 8px rgba(11,19,43,.25);
+    }
+    .mltc--brand .mltc-bar-title { color: #fff; letter-spacing: .01em; }
+    .mltc--brand .mltc-bar-sub { color: rgba(255,255,255,.55); }
+    .mltc--brand .mltc-logo {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.12);
+    }
+
+    /* ── HA-native header ── */
+    .mltc--ha .mltc-bar {
+      background: var(--mltc-surface2);
+      border-bottom: 1px solid var(--mltc-border);
+    }
+    .mltc--ha .mltc-logo {
+      background: linear-gradient(135deg, rgba(20,184,166,.15), rgba(30,58,138,.12));
+      border: 1px solid var(--mltc-border);
+    }
+
     .mltc-bar {
-      display: flex; align-items: center; justify-content: space-between; gap: 6px;
-      padding: 6px 10px; background: var(--secondary-background-color);
-      border-bottom: 1px solid var(--divider-color, rgba(127,127,127,.3));
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 8px 10px;
     }
-    .mltc-bar-title { font-weight: 700; font-size: 0.8rem; }
-    .mltc-bar-sub { font-size: 0.65rem; opacity: .6; margin-top: 1px; }
-    .mltc-pills { display: flex; gap: 3px; }
+    .mltc-brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .mltc-logo {
+      width: 30px; height: 30px; border-radius: 8px;
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .mltc-bar-title { font-weight: 700; font-size: 0.82rem; line-height: 1.1; }
+    .mltc-bar-sub { font-size: 0.62rem; margin-top: 2px; }
+
+    .mltc-pills { display: flex; gap: 4px; flex-shrink: 0; }
     .mltc-pill {
-      min-width: 1.25rem; padding: 0 6px; height: 1.25rem; line-height: 1.25rem;
-      border-radius: 10px; font-size: 0.68rem; font-weight: 700; text-align: center;
+      min-width: 1.3rem; padding: 0 7px; height: 1.3rem; line-height: 1.3rem;
+      border-radius: 999px; font-size: 0.68rem; font-weight: 700; text-align: center;
     }
-    .mltc-pill--a { background: var(--primary-color); color: var(--text-primary-color,#fff); }
-    .mltc-pill--d { background: #b45309; color: #fff; }
-    .mltc-pill--p { background: #b91c1c; color: #fff; }
-    .mltc-pill--z { opacity: .35; background: var(--divider-color, #ccc); }
-    .mltc-sec { border-bottom: 1px solid var(--divider-color, rgba(127,127,127,.2)); }
+    .mltc-pill--a { background: var(--mltc-teal); color: #fff; }
+    .mltc-pill--d { background: var(--mltc-amber); color: #fff; }
+    .mltc-pill--p { background: var(--mltc-red); color: #fff; }
+    .mltc-pill--z { opacity: .3; background: var(--mltc-border); color: var(--mltc-muted); }
+
+    .mltc-sec { border-bottom: 1px solid var(--mltc-border); }
     .mltc-sec:last-child { border-bottom: none; }
     .mltc-sec-h {
-      padding: 4px 10px 2px; font-size: 0.62rem; font-weight: 700;
-      text-transform: uppercase; letter-spacing: .05em; opacity: .65;
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 10px 3px; font-size: 0.62rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em;
+      color: var(--mltc-muted);
+      border-left: 3px solid var(--mltc-teal);
+      margin: 6px 8px 0;
+      padding-left: 8px;
     }
+    .mltc-sec-h--extra { border-left-color: var(--mltc-ios); }
+    .mltc-sec-h--doc { border-left-color: var(--mltc-amber); }
+
     .mltc-scroll {
       max-height: var(--mltc-h, 110px); overflow: auto;
-      margin: 0; padding: 0;
+      margin: 0; padding: 2px 6px 6px;
     }
-    .mltc-tbl {
-      width: 100%; border-collapse: collapse; table-layout: fixed;
+    .mltc-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
+    .mltc-scroll::-webkit-scrollbar-thumb {
+      background: var(--mltc-teal); border-radius: 4px; opacity: .5;
     }
+
+    .mltc-tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .mltc-tbl th {
-      padding: 2px 6px; font-size: 0.6rem; font-weight: 700;
-      text-transform: uppercase; letter-spacing: .04em; opacity: .55;
-      text-align: left; border-bottom: 1px solid var(--divider-color, rgba(127,127,127,.35));
-      background: var(--card-background-color, var(--ha-card-background));
+      padding: 3px 6px; font-size: 0.58rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .05em;
+      color: var(--mltc-muted);
+      text-align: left;
+      border-bottom: 2px solid var(--mltc-border);
+      background: var(--mltc-surface2);
       position: sticky; top: 0; z-index: 1;
     }
+    .mltc--brand .mltc-tbl th {
+      background: rgba(16,185,129,.06);
+      border-bottom-color: rgba(16,185,129,.2);
+    }
     .mltc-tbl td {
-      padding: 3px 6px; height: 1.35rem; max-height: 1.35rem;
+      padding: 3px 6px; height: 1.4rem;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      border-bottom: 1px solid rgba(127,127,127,.1);
+      border-bottom: 1px solid var(--mltc-border);
       vertical-align: middle;
     }
     .mltc-tbl tr:last-child td { border-bottom: none; }
-    .mltc-tbl tbody tr:hover td { background: rgba(var(--rgb-primary-color,3,169,244),.08); }
-    .mltc-tbl .n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-    .mltc-tbl tr.bad td { color: #c62828; }
-    .mltc-tbl tr.warn td { color: #e65100; }
-    .mltc-foot { padding: 2px 10px 5px; font-size: 0.6rem; opacity: .5; text-align: right; }
-    .mltc-ok { padding: 12px; text-align: center; opacity: .65; font-size: 0.75rem; }
-    .mltc-err { padding: 10px; color: var(--error-color,#c62828); font-size: 0.75rem; }
+    .mltc-tbl tbody tr:nth-child(even) td { background: rgba(16,185,129,.04); }
+    .mltc--dark .mltc-tbl tbody tr:nth-child(even) td { background: rgba(255,255,255,.03); }
+    .mltc-tbl tbody tr:hover td { background: rgba(16,185,129,.1); }
+    .mltc-tbl .n {
+      text-align: right; font-variant-numeric: tabular-nums;
+      font-weight: 700; color: var(--mltc-blue);
+    }
+    .mltc--dark .mltc-tbl .n { color: #5eb0ff; }
+    .mltc-tbl tr.bad td { color: var(--mltc-red); }
+    .mltc-tbl tr.warn td { color: var(--mltc-amber); }
+
+    .mltc-foot {
+      padding: 2px 10px 6px; font-size: 0.58rem;
+      color: var(--mltc-muted); text-align: right;
+    }
+    .mltc-ok {
+      padding: 14px; text-align: center; font-size: 0.75rem;
+      color: var(--mltc-teal); font-weight: 600;
+    }
+    .mltc--brand .mltc-ok { background: rgba(16,185,129,.06); }
+    .mltc-err { padding: 10px; color: var(--mltc-red); font-size: 0.75rem; }
   `;
 }
 
@@ -161,6 +266,7 @@ class MyLifeTrackerCard extends HTMLElement {
       show_bills: true,
       show_extra_costs: true,
       show_documents: false,
+      theme: "brand",
       bill_columns: ["type", "household", "period", "amount"],
       extra_columns: ["description", "period", "amount"],
       doc_columns: ["name", "date", "days"],
@@ -226,11 +332,11 @@ class MyLifeTrackerCard extends HTMLElement {
     };
   }
 
-  _sec(title, table, total, max) {
-    const more = total > max ? `<div class="mltc-foot">+${total - max} more</div>` : "";
+  _sec(title, table, total, max, secClass = "") {
+    const more = total > max ? `<div class="mltc-foot">+${total - max} további</div>` : "";
     return `
       <div class="mltc-sec">
-        <div class="mltc-sec-h">${mltcEsc(title)} (${total})</div>
+        <div class="mltc-sec-h ${secClass}">${mltcEsc(title)} <span style="opacity:.7">(${total})</span></div>
         <div class="mltc-scroll">${table}</div>
         ${more}
       </div>`;
@@ -269,33 +375,42 @@ class MyLifeTrackerCard extends HTMLElement {
         "Számlák",
         mltcTable(MLTC_BILL_COLS, cfg.bill_columns, bills.slice(0, maxR).map((b) => this._billRow(b))),
         bills.length,
-        maxR
+        maxR,
+        ""
       ));
     }
     if (cfg.show_extra_costs !== false) {
       parts.push(this._sec(
-        "Extra",
+        "Extra költségek",
         mltcTable(MLTC_EXTRA_COLS, cfg.extra_columns, extra.slice(0, maxR).map((x) => this._extraRow(x))),
         extra.length,
-        maxR
+        maxR,
+        "mltc-sec-h--extra"
       ));
     }
     if (cfg.show_documents !== false) {
       parts.push(this._sec(
-        "Okmány",
+        "Okmányok",
         mltcTable(MLTC_DOC_COLS, cfg.doc_columns, docs.slice(0, maxR).map((d) => this._docRow(d)), (r) =>
           r._days < 0 ? "bad" : r._days <= 60 ? "warn" : ""
         ),
         docs.length,
-        maxR
+        maxR,
+        "mltc-sec-h--doc"
       ));
     }
 
+    const theme = cfg.theme === "ha" ? "ha" : "brand";
+    const dark = mltcIsDark(this._hass) ? " mltc--dark" : "";
+
     const hdr = cfg.show_header !== false ? `
       <div class="mltc-bar">
-        <div>
-          <div class="mltc-bar-title">MyLife</div>
-          <div class="mltc-bar-sub">≥${minY} · v${MLTC_VERSION}</div>
+        <div class="mltc-brand">
+          <div class="mltc-logo">${MLTC_LOGO_SVG}</div>
+          <div>
+            <div class="mltc-bar-title">MyLife Tracker</div>
+            <div class="mltc-bar-sub">≥ ${minY} · v${MLTC_VERSION}</div>
+          </div>
         </div>
         <div class="mltc-pills">
           ${pill(totalN, totalN > 0, "mltc-pill--a")}
@@ -310,7 +425,7 @@ class MyLifeTrackerCard extends HTMLElement {
 
     this.innerHTML = `
       <ha-card>
-        <div class="mltc" style="--mltc-h:${maxH}px">${hdr}${body}</div>
+        <div class="mltc mltc--${theme}${dark}" style="--mltc-h:${maxH}px">${hdr}${body}</div>
       </ha-card>`;
   }
 }
@@ -352,6 +467,12 @@ class MyLifeTrackerCardEditor extends HTMLElement {
     this.innerHTML = `
       <div style="padding:10px;display:flex;flex-direction:column;gap:8px;font-size:12px">
         <div style="font-weight:700;color:var(--primary-color)">MyLife card v${MLTC_VERSION}</div>
+        <label>Theme
+          <select class="theme" style="width:100%;margin-top:2px">
+            <option value="brand">MyLife brand (navy + teal)</option>
+            <option value="ha">Home Assistant native</option>
+          </select>
+        </label>
         <label>Entity<input class="e" style="width:100%;margin-top:2px"/></label>
         <label>Min year (hide older)<input class="y" type="number" style="width:100%;margin-top:2px"/></label>
         <label>Max rows<input class="r" type="number" min="3" max="30" style="width:100%;margin-top:2px"/></label>
@@ -367,6 +488,7 @@ class MyLifeTrackerCardEditor extends HTMLElement {
 
     const q = (s) => this.querySelector(s);
     q(".e").value = c.entity || "";
+    q(".theme").value = c.theme === "ha" ? "ha" : "brand";
     q(".y").value = c.min_year ?? 2025;
     q(".r").value = c.max_rows ?? 8;
     q(".h").value = c.max_height ?? 110;
@@ -376,6 +498,7 @@ class MyLifeTrackerCardEditor extends HTMLElement {
     q(".sd").checked = c.show_documents !== false;
 
     q(".e").onchange = (e) => this._set("entity", e.target.value);
+    q(".theme").onchange = (e) => this._set("theme", e.target.value);
     q(".y").onchange = (e) => this._set("min_year", Number(e.target.value) || 2025);
     q(".r").onchange = (e) => this._set("max_rows", Number(e.target.value) || 8);
     q(".h").onchange = (e) => this._set("max_height", Number(e.target.value) || 110);
