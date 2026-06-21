@@ -1,7 +1,7 @@
 /**
- * MyLife Tracker Lovelace card v1.4 — shadow DOM + brand theme
+ * MyLife Tracker Lovelace cards v1.5 — full table + compact glance
  */
-const MLTC_VERSION = "1.4.0";
+const MLTC_VERSION = "1.5.0";
 
 const MLTC_BILL_COLS = {
   type: { label: "Típus", w: "18%", chip: true },
@@ -176,6 +176,41 @@ function mltcStyles(dark, theme) {
     }
     .more { padding: 4px 10px 6px; font-size: 9px; color: var(--muted); text-align: right; }
     .err { padding: 14px; color: var(--red); }
+
+    /* ── Compact / glance layout ── */
+    .card--compact .hdr { padding: 8px 12px; }
+    .card--compact .logo { width: 28px; height: 28px; border-radius: 8px; }
+    .card--compact .logo svg { width: 16px; height: 16px; }
+    .card--compact .title { font-size: 12px; }
+    .card--compact .sub { display: none; }
+    .card--compact .stat { min-width: 28px; padding: 3px 6px; border-radius: 8px; }
+    .card--compact .stat-val { font-size: 12px; }
+    .card--compact .stat-lbl { font-size: 7px; }
+    .compact-row {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 8px 12px 10px;
+      background: var(--bg2);
+      border-top: 1px solid var(--line);
+    }
+    .compact-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 999px; font-size: 10px; font-weight: 600;
+      border: 1px solid var(--line); background: var(--bg);
+      white-space: nowrap;
+    }
+    .compact-chip--z { opacity: .45; }
+    .compact-chip--pay { border-color: rgba(220,38,38,.35); color: var(--red); }
+    .compact-chip--doc { border-color: rgba(217,119,6,.35); color: var(--amber); }
+    .compact-chip--ok {
+      border-color: rgba(16,185,129,.35); color: var(--teal);
+      background: ${dark ? "rgba(16,185,129,.1)" : "var(--teal-bg)"};
+    }
+    .compact-n { font-weight: 800; font-variant-numeric: tabular-nums; }
+    .compact-ok {
+      padding: 10px 12px; text-align: center; font-size: 11px;
+      color: var(--teal); font-weight: 600;
+      background: ${dark ? "rgba(16,185,129,.08)" : "var(--teal-bg)"};
+    }
   `;
 }
 
@@ -249,6 +284,7 @@ class MyLifeTrackerCard extends HTMLElement {
     return {
       type: "custom:mylife-tracker-card",
       entity: "sensor.mylife_tracker_status",
+      layout: "full",
       min_year: 2025,
       max_rows: 8,
       max_height: 120,
@@ -284,7 +320,7 @@ class MyLifeTrackerCard extends HTMLElement {
   }
 
   getCardSize() {
-    return 2;
+    return this._config?.layout === "compact" ? 1 : 2;
   }
 
   _billRow(b) {
@@ -334,6 +370,44 @@ class MyLifeTrackerCard extends HTMLElement {
       </div>`;
   }
 
+  _compactChip(label, count, cls) {
+    const z = count ? "" : " compact-chip--z";
+    return `<span class="compact-chip ${cls}${z}"><span class="compact-n">${count}</span> ${mltcEsc(label)}</span>`;
+  }
+
+  _renderCompact(cfg, theme, dark, bills, extra, docs, payN, docN, totalN, minY) {
+    const stat = (val, lbl, cls) =>
+      `<div class="stat ${val ? cls : "stat--z"}"><span class="stat-val">${val}</span><span class="stat-lbl">${lbl}</span></div>`;
+
+    const hdr = `
+      <div class="hdr">
+        <div class="hdr-left">
+          <div class="logo">${mltcLogoSvg()}</div>
+          <div><div class="title">MyLife</div><div class="sub">≥ ${minY}</div></div>
+        </div>
+        <div class="stats">
+          ${stat(totalN, "Össz", "stat--on")}
+          ${stat(docN, "Okm", "stat--doc")}
+          ${stat(payN, "Fiz", "stat--pay")}
+        </div>
+      </div>`;
+
+    const chips = [];
+    if (cfg.show_bills !== false) chips.push(this._compactChip("számla", bills.length, bills.length ? "compact-chip--pay" : ""));
+    if (cfg.show_extra_costs !== false) chips.push(this._compactChip("extra", extra.length, extra.length ? "compact-chip--pay" : ""));
+    if (cfg.show_documents !== false) chips.push(this._compactChip("okmány", docs.length, docs.length ? "compact-chip--doc" : ""));
+
+    const body = totalN
+      ? `<div class="compact-row">${chips.join("")}</div>`
+      : `<div class="compact-ok">✓ Minden rendben</div>`;
+
+    return `
+      <style>${mltcStyles(dark, theme)}</style>
+      <ha-card>
+        <div class="card card--compact">${hdr}${body}</div>
+      </ha-card>`;
+  }
+
   _render() {
     if (!this._config || !this._hass || !this.shadowRoot) return;
 
@@ -360,6 +434,11 @@ class MyLifeTrackerCard extends HTMLElement {
     const payN = bills.length + extra.length;
     const docN = docs.length;
     const totalN = payN + docN;
+
+    if (cfg.layout === "compact") {
+      this.shadowRoot.innerHTML = this._renderCompact(cfg, theme, dark, bills, extra, docs, payN, docN, totalN, minY);
+      return;
+    }
 
     const stat = (val, lbl, cls) =>
       `<div class="stat ${val ? cls : "stat--z"}"><span class="stat-val">${val}</span><span class="stat-lbl">${lbl}</span></div>`;
@@ -455,7 +534,13 @@ class MyLifeTrackerCardEditor extends HTMLElement {
     if (!c) return;
     this.innerHTML = `
       <div style="padding:10px;display:flex;flex-direction:column;gap:8px;font-size:12px">
-        <div style="font-weight:700;color:#10b981">MyLife card v${MLTC_VERSION} (shadow DOM)</div>
+        <div style="font-weight:700;color:#10b981">MyLife card v${MLTC_VERSION}</div>
+        <label>Layout
+          <select class="layout" style="width:100%;margin-top:2px">
+            <option value="full">Full (tables)</option>
+            <option value="compact">Compact (badges only)</option>
+          </select>
+        </label>
         <label>Theme<select class="theme" style="width:100%;margin-top:2px">
           <option value="brand">MyLife brand</option><option value="ha">HA native</option>
         </select></label>
@@ -473,7 +558,9 @@ class MyLifeTrackerCardEditor extends HTMLElement {
       </div>`;
 
     const q = (s) => this.querySelector(s);
+    const isCompact = c.layout === "compact";
     q(".e").value = c.entity || "";
+    q(".layout").value = c.layout === "compact" ? "compact" : "full";
     q(".theme").value = c.theme === "ha" ? "ha" : "brand";
     q(".y").value = c.min_year ?? 2025;
     q(".r").value = c.max_rows ?? 8;
@@ -483,7 +570,17 @@ class MyLifeTrackerCardEditor extends HTMLElement {
     q(".se").checked = c.show_extra_costs !== false;
     q(".sd").checked = c.show_documents !== false;
 
+    // Hide table-only options in compact mode
+    ["r", "h"].forEach((cls) => {
+      const el = q(`.${cls}`)?.closest("label");
+      if (el) el.style.display = isCompact ? "none" : "";
+    });
+    this.querySelectorAll("fieldset").forEach((fs) => {
+      fs.style.display = isCompact ? "none" : "";
+    });
+
     q(".e").onchange = (e) => this._set("entity", e.target.value);
+    q(".layout").onchange = (e) => { this._set("layout", e.target.value); this._render(); };
     q(".theme").onchange = (e) => this._set("theme", e.target.value);
     q(".y").onchange = (e) => this._set("min_year", Number(e.target.value) || 2025);
     q(".r").onchange = (e) => this._set("max_rows", Number(e.target.value) || 8);
@@ -510,11 +607,46 @@ class MyLifeTrackerCardEditor extends HTMLElement {
 customElements.define("mylife-tracker-card", MyLifeTrackerCard);
 customElements.define("mylife-tracker-card-editor", MyLifeTrackerCardEditor);
 
-window.customCards = window.customCards.filter((c) => c.type !== "mylife-tracker-card");
+/** Compact glance card — same data, badge-only layout */
+class MyLifeTrackerGlanceCard extends MyLifeTrackerCard {
+  static getStubConfig() {
+    return {
+      ...MyLifeTrackerCard.getStubConfig(),
+      type: "custom:mylife-tracker-glance-card",
+      layout: "compact",
+      show_documents: false,
+    };
+  }
+
+  static getConfigElement() {
+    return document.createElement("mylife-tracker-card-editor");
+  }
+
+  setConfig(config) {
+    super.setConfig({ ...config, layout: "compact" });
+  }
+
+  getCardSize() {
+    return 1;
+  }
+}
+
+customElements.define("mylife-tracker-glance-card", MyLifeTrackerGlanceCard);
+
+window.customCards = window.customCards.filter(
+  (c) => c.type !== "mylife-tracker-card" && c.type !== "mylife-tracker-glance-card"
+);
 window.customCards.push({
   type: "mylife-tracker-card",
   name: `MyLife Tracker Card v${MLTC_VERSION}`,
-  description: "Branded table card with shadow DOM styling",
+  description: "Full table or compact layout",
+  preview: true,
+  version: MLTC_VERSION,
+});
+window.customCards.push({
+  type: "mylife-tracker-glance-card",
+  name: `MyLife Tracker Glance v${MLTC_VERSION}`,
+  description: "Compact badge-only MyLife status",
   preview: true,
   version: MLTC_VERSION,
 });

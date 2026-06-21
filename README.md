@@ -1,6 +1,6 @@
 # MyLife Tracker Card
 
-Compact **table** Lovelace card for the [MyLife Tracker Home Assistant integration](https://github.com/benalfoldi/mylife-tracker-home-assistant).
+Lovelace cards for the [MyLife Tracker Home Assistant integration](https://github.com/benalfoldi/mylife-tracker-home-assistant): a **full table** card and a **compact glance** card.
 
 Requires the integration to be installed and configured with *your* MyLife Tracker server URL and API key.
 
@@ -10,11 +10,12 @@ Requires the integration to be installed and configured with *your* MyLife Track
 2. URL: `https://github.com/benalfoldi/mylife-tracker-card` — category **Lovelace**
 3. Install **MyLife Tracker Card** → hard-refresh dashboard (Ctrl+F5)
 
-## Example YAML
+## Full table card
 
 ```yaml
 type: custom:mylife-tracker-card
 entity: sensor.mylife_tracker_status
+layout: full
 theme: brand
 min_year: 2025
 max_rows: 8
@@ -33,16 +34,31 @@ extra_columns:
   - amount
 ```
 
+## Compact glance card
+
+Small badge-only card for dashboards — counts only, no tables. Add via card picker as **MyLife Tracker Glance**, or set `layout: compact` on the main card:
+
+```yaml
+type: custom:mylife-tracker-glance-card
+entity: sensor.mylife_tracker_status
+theme: brand
+min_year: 2025
+show_bills: true
+show_extra_costs: true
+show_documents: false
+```
+
 ## Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `entity` | required | Status sensor from the integration |
+| `layout` | `full` | `full` = tables; `compact` = header + count badges only |
 | `theme` | `brand` | `brand` = MyLife navy/teal; `ha` = native HA colors |
 | `min_year` | `2025` | Hide items with billing year before this |
-| `max_rows` | `8` | Rows per section |
-| `max_height` | `120` | Scroll area height (px) |
-| `bill_columns` / `extra_columns` / `doc_columns` | see example | Customize table columns (UI editor) |
+| `max_rows` | `8` | Rows per section (full layout only) |
+| `max_height` | `120` | Scroll area height in px (full layout only) |
+| `bill_columns` / `extra_columns` / `doc_columns` | see example | Customize table columns (full layout, UI editor) |
 
 ### Column keys
 
