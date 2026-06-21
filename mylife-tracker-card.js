@@ -1,7 +1,7 @@
 /**
  * MyLife Tracker Lovelace cards v1.5 — full table + compact glance
  */
-const MLTC_VERSION = "1.6.2";
+const MLTC_VERSION = "1.6.3";
 
 const MLTC_BILL_COLS = {
   type: { label: "Típus", w: "18%", chip: true },
@@ -283,6 +283,34 @@ function mltcFilterDocs(docs, users, persons) {
   });
 }
 
+function mltcHasListData(a) {
+  if (!a) return false;
+  return Array.isArray(a.unpaid_bills)
+    || Array.isArray(a.unpaid_extra_costs)
+    || (a.household_labels && Object.keys(a.household_labels).length > 0);
+}
+
+/** Status sensor has lists + labels; count sensors (badge_count, etc.) do not. */
+function mltcResolveDataEntity(hass, entity) {
+  if (!hass || !entity) return entity;
+  const attrs = hass.states[entity]?.attributes;
+  if (mltcHasListData(attrs)) return entity;
+  const ids = Object.keys(hass.states || {});
+  const prefer = ids.find((e) => e.includes("mylife_tracker") && e.endsWith("_status"));
+  if (prefer && mltcHasListData(hass.states[prefer].attributes)) return prefer;
+  const prefix = entity.includes(".") ? entity.slice(0, entity.lastIndexOf("_")) : "";
+  if (prefix) {
+    const sibling = ids.find((e) => e.startsWith(prefix + "_") && e.endsWith("_status"));
+    if (sibling && mltcHasListData(hass.states[sibling].attributes)) return sibling;
+  }
+  return ids.find((e) => e.includes("mylife_tracker") && mltcHasListData(hass.states[e].attributes)) || entity;
+}
+
+function mltcDataAttributes(hass, entity) {
+  const id = mltcResolveDataEntity(hass, entity);
+  return hass?.states[id]?.attributes || {};
+}
+
 function mltcLabel(map, id) {
   if (id == null || id === "") return "";
   const key = String(id);
@@ -290,13 +318,16 @@ function mltcLabel(map, id) {
 }
 
 function mltcDiscoverFilters(hass, entity) {
-  const out = { households: [], users: [], persons: [] };
+  const out = { households: [], users: [], persons: [], dataEntity: entity, needsStatus: false };
   if (!hass || !entity) return out;
-  const a = hass.states[entity]?.attributes || {};
+  const dataEntity = mltcResolveDataEntity(hass, entity);
+  out.dataEntity = dataEntity;
+  out.needsStatus = dataEntity !== entity;
+  const a = mltcDataAttributes(hass, entity);
   const hhLabels = a.household_labels || {};
   const userLabels = a.user_labels || {};
-  const hhs = new Set();
-  const users = new Set();
+  const hhs = new Set(Object.keys(hhLabels));
+  const users = new Set(Object.keys(userLabels));
   const persons = new Set();
   [...(a.unpaid_bills || []), ...(a.unpaid_extra_costs || [])].forEach((i) => {
     if (i.household_id) hhs.add(String(i.household_id));
@@ -365,7 +396,10 @@ class MyLifeTrackerCard extends HTMLElement {
 
   static getStubConfig(hass, entities, entitiesFallback) {
     const pool = [...(entities || []), ...(entitiesFallback || [])];
-    const entity = pool.find((e) => e.includes("mylife_tracker"))
+    const fromPool = pool.find((e) => e.includes("mylife_tracker") && e.endsWith("_status"))
+      || pool.find((e) => e.includes("mylife_tracker"));
+    const entity = fromPool
+      || (hass && Object.keys(hass.states || {}).find((e) => e.includes("mylife_tracker") && e.endsWith("_status")))
       || (hass && Object.keys(hass.states || {}).find((e) => e.includes("mylife_tracker")))
       || "sensor.mylife_tracker_status";
     return {
@@ -522,7 +556,7 @@ class MyLifeTrackerCard extends HTMLElement {
       return;
     }
 
-    const a = st.attributes || {};
+    const a = mltcDataAttributes(this._hass, cfg.entity);
     const hhLabels = a.household_labels || {};
     const minY = Number(cfg.min_year) || 2025;
     const maxR = Number(cfg.max_rows) || 8;
@@ -630,12 +664,12 @@ class MyLifeTrackerCardEditor extends HTMLElement {
     }));
   }
 
-  _filterBox(title, configKey, options, selected) {
+  _filterBox(title, configKey, options, selected, emptyHint) {
     const sel = new Set((selected || []).map(String));
     if (!options.length) {
       return `<fieldset style="margin:0;padding:6px 8px;border:1px solid #ccc">
         <legend style="font-size:11px">${mltcEsc(title)}</legend>
-        <div style="font-size:10px;color:#888">Nincs adat — válassz entity-t, majd frissíts</div>
+        <div style="font-size:10px;color:#888">${mltcEsc(emptyHint || "Nincs adat")}</div>
       </fieldset>`;
     }
     return `<fieldset style="margin:0;padding:6px 8px;border:1px solid #ccc">
@@ -664,9 +698,19 @@ class MyLifeTrackerCardEditor extends HTMLElement {
     const c = this._config;
     if (!c) return;
     const disc = mltcDiscoverFilters(this._hass, c.entity);
+    const emptyHint = disc.needsStatus
+      ? `Használd: ${disc.dataEntity} (a számláló entity-nek nincs listája)`
+      : "Nincs adat — frissítsd az integrációt (deploy + HACS update), majd várj egy poll ciklust";
+    const entityNote = disc.needsStatus
+      ? `<div style="font-size:10px;color:#d97706;padding:4px 6px;background:#fffbeb;border-radius:6px">
+          Szűrők és táblázat: <strong>${mltcEsc(disc.dataEntity)}</strong>
+          (a ${mltcEsc(c.entity)} csak szám — ajánlott: Status entity)
+        </div>`
+      : "";
     this.innerHTML = `
       <div style="padding:10px;display:flex;flex-direction:column;gap:8px;font-size:12px">
         <div style="font-weight:700;color:#10b981">MyLife card v${MLTC_VERSION}</div>
+        ${entityNote}
         <label>Layout
           <select class="layout" style="width:100%;margin-top:2px">
             <option value="full">Full (tables)</option>
@@ -682,16 +726,16 @@ class MyLifeTrackerCardEditor extends HTMLElement {
         <label>Max height px<input class="h" type="number" min="60" max="300" style="width:100%;margin-top:2px"/></label>
         <label><input class="hdr" type="checkbox"/> Header</label>
         <label><input class="sb" type="checkbox"/> Számlák</label>
-        ${this._filterBox("Számlák — háztartás", "bill_households", disc.households, c.bill_households)}
-        ${this._filterBox("Számlák — felhasználók", "bill_users", disc.users, c.bill_users)}
+        ${this._filterBox("Számlák — háztartás", "bill_households", disc.households, c.bill_households, emptyHint)}
+        ${this._filterBox("Számlák — felhasználók", "bill_users", disc.users, c.bill_users, emptyHint)}
         ${this._colBox("Számla oszlopok", "bill", MLTC_BILL_COLS, c.bill_columns)}
         <label><input class="se" type="checkbox"/> Extra</label>
-        ${this._filterBox("Extra — háztartás", "extra_households", disc.households, c.extra_households)}
-        ${this._filterBox("Extra — felhasználók", "extra_users", disc.users, c.extra_users)}
+        ${this._filterBox("Extra — háztartás", "extra_households", disc.households, c.extra_households, emptyHint)}
+        ${this._filterBox("Extra — felhasználók", "extra_users", disc.users, c.extra_users, emptyHint)}
         ${this._colBox("Extra oszlopok", "extra", MLTC_EXTRA_COLS, c.extra_columns)}
         <label><input class="sd" type="checkbox"/> Okmány</label>
-        ${this._filterBox("Okmány — felhasználó (id)", "doc_users", disc.users, c.doc_users)}
-        ${this._filterBox("Okmány — személy (név)", "doc_persons", disc.persons, c.doc_persons)}
+        ${this._filterBox("Okmány — felhasználó (id)", "doc_users", disc.users, c.doc_users, emptyHint)}
+        ${this._filterBox("Okmány — személy (név)", "doc_persons", disc.persons, c.doc_persons, emptyHint)}
         ${this._colBox("Okmány oszlopok", "doc", MLTC_DOC_COLS, c.doc_columns)}
       </div>`;
 
