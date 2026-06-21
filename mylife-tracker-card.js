@@ -1,7 +1,7 @@
 /**
  * MyLife Tracker Lovelace cards v1.5 — full table + compact glance
  */
-const MLTC_VERSION = "1.5.1";
+const MLTC_VERSION = "1.6.0";
 
 const MLTC_BILL_COLS = {
   type: { label: "Típus", w: "18%", chip: true },
@@ -244,6 +244,79 @@ function mltcFilterYear(items, minYear) {
   });
 }
 
+function mltcHasFilter(arr) {
+  return Array.isArray(arr) && arr.length > 0;
+}
+
+function mltcStrList(arr) {
+  return mltcHasFilter(arr) ? new Set(arr.map((x) => String(x))) : null;
+}
+
+/** Filter bills/extra by household_id and user_ids (empty filter = show all). */
+function mltcFilterHouseholdUser(items, households, users) {
+  const hhSet = mltcStrList(households);
+  const userSet = mltcStrList(users);
+  if (!hhSet && !userSet) return items || [];
+  return (items || []).filter((item) => {
+    const hh = String(item.household_id ?? "");
+    if (hhSet && !hhSet.has(hh)) return false;
+    if (!userSet) return true;
+    const uids = Array.isArray(item.user_ids) ? item.user_ids.map(String) : [];
+    if (!uids.length) return true;
+    return uids.some((u) => userSet.has(u));
+  });
+}
+
+/** Filter documents by user_id and/or person label. */
+function mltcFilterDocs(docs, users, persons) {
+  const userSet = mltcStrList(users);
+  const personSet = mltcStrList(persons);
+  if (!userSet && !personSet) return docs || [];
+  return (docs || []).filter((d) => {
+    const uid = d.user_id != null && d.user_id !== "" ? String(d.user_id) : "";
+    const person = String(d.person ?? "");
+    if (userSet && uid && userSet.has(uid)) return true;
+    if (personSet && person && personSet.has(person)) return true;
+    if (userSet && !personSet) return false;
+    if (personSet && !userSet) return personSet.has(person);
+    return false;
+  });
+}
+
+function mltcDiscoverFilters(hass, entity) {
+  const out = { households: [], users: [], persons: [] };
+  if (!hass || !entity) return out;
+  const a = hass.states[entity]?.attributes || {};
+  const hhs = new Set();
+  const users = new Set();
+  const persons = new Set();
+  [...(a.unpaid_bills || []), ...(a.unpaid_extra_costs || [])].forEach((i) => {
+    if (i.household_id) hhs.add(String(i.household_id));
+    (i.user_ids || []).forEach((u) => users.add(String(u)));
+  });
+  [...(a.expired_docs || []), ...(a.warning_docs || [])].forEach((d) => {
+    if (d.person) persons.add(String(d.person));
+    if (d.user_id) users.add(String(d.user_id));
+  });
+  out.households = [...hhs].sort().map((id) => ({ id, label: id }));
+  out.users = [...users].sort().map((id) => ({ id, label: id }));
+  out.persons = [...persons].sort().map((id) => ({ id, label: id }));
+  return out;
+}
+
+function mltcNormFilterArrays(cfg) {
+  const keys = [
+    "bill_households", "bill_users",
+    "extra_households", "extra_users",
+    "doc_users", "doc_persons",
+  ];
+  const out = { ...cfg };
+  keys.forEach((k) => {
+    out[k] = Array.isArray(cfg[k]) ? cfg[k].map(String) : [];
+  });
+  return out;
+}
+
 function mltcCols(all, selected) {
   const keys = Array.isArray(selected) && selected.length ? selected : Object.keys(all);
   return keys.filter((k) => all[k]);
@@ -295,6 +368,12 @@ class MyLifeTrackerCard extends HTMLElement {
       bill_columns: ["type", "household", "period", "amount"],
       extra_columns: ["description", "type", "period", "amount"],
       doc_columns: ["name", "date", "days"],
+      bill_households: [],
+      bill_users: [],
+      extra_households: [],
+      extra_users: [],
+      doc_users: [],
+      doc_persons: [],
     };
   }
 
@@ -305,12 +384,12 @@ class MyLifeTrackerCard extends HTMLElement {
   setConfig(config) {
     if (!config.entity) throw new Error("entity required");
     const d = MyLifeTrackerCard.getStubConfig();
-    this._config = {
+    this._config = mltcNormFilterArrays({
       ...d, ...config,
       min_year: Number(config.min_year ?? d.min_year) || 2025,
       max_rows: Number(config.max_rows ?? d.max_rows) || 8,
       max_height: Number(config.max_height ?? d.max_height) || 120,
-    };
+    });
   }
 
   set hass(hass) {
@@ -434,9 +513,21 @@ class MyLifeTrackerCard extends HTMLElement {
     const maxR = Number(cfg.max_rows) || 8;
     const maxH = Number(cfg.max_height) || 120;
 
-    const bills = mltcFilterYear(a.unpaid_bills || [], minY);
-    const extra = mltcFilterYear(a.unpaid_extra_costs || [], minY);
-    const docs = [...(a.expired_docs || []), ...(a.warning_docs || [])];
+    const bills = mltcFilterHouseholdUser(
+      mltcFilterYear(a.unpaid_bills || [], minY),
+      cfg.bill_households,
+      cfg.bill_users
+    );
+    const extra = mltcFilterHouseholdUser(
+      mltcFilterYear(a.unpaid_extra_costs || [], minY),
+      cfg.extra_households,
+      cfg.extra_users
+    );
+    const docs = mltcFilterDocs(
+      [...(a.expired_docs || []), ...(a.warning_docs || [])],
+      cfg.doc_users,
+      cfg.doc_persons
+    );
     const payN = bills.length + extra.length;
     const docN = docs.length;
     const totalN = payN + docN;
@@ -514,6 +605,7 @@ class MyLifeTrackerCardEditor extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    if (this._config) this._render();
   }
 
   _set(key, val) {
@@ -523,9 +615,27 @@ class MyLifeTrackerCardEditor extends HTMLElement {
     }));
   }
 
+  _filterBox(title, configKey, options, selected) {
+    const sel = new Set((selected || []).map(String));
+    if (!options.length) {
+      return `<fieldset style="margin:0;padding:6px 8px;border:1px solid #ccc">
+        <legend style="font-size:11px">${mltcEsc(title)}</legend>
+        <div style="font-size:10px;color:#888">Nincs adat — válassz entity-t, majd frissíts</div>
+      </fieldset>`;
+    }
+    return `<fieldset style="margin:0;padding:6px 8px;border:1px solid #ccc">
+      <legend style="font-size:11px">${mltcEsc(title)} <span style="font-weight:400;opacity:.7">(üres = mind)</span></legend>
+      ${options.map((o) =>
+    `<label style="display:block;font-size:11px;margin:2px 0">
+          <input type="checkbox" data-fk="${mltcEsc(configKey)}" data-fv="${mltcEsc(o.id)}" ${sel.has(String(o.id)) ? "checked" : ""}/> ${mltcEsc(o.label)}
+        </label>`
+  ).join("")}
+    </fieldset>`;
+  }
+
   _colBox(title, prefix, allCols, selected) {
     const sel = new Set(selected || []);
-    return `<fieldset style="margin:0;padding:6px 8px;border:1px solid #ccc">
+    return `<fieldset class="mltc-cols-fs" style="margin:0;padding:6px 8px;border:1px solid #ccc">
       <legend style="font-size:11px">${mltcEsc(title)}</legend>
       ${Object.entries(allCols).map(([k, c]) =>
     `<label style="display:block;font-size:11px;margin:2px 0">
@@ -538,6 +648,7 @@ class MyLifeTrackerCardEditor extends HTMLElement {
   _render() {
     const c = this._config;
     if (!c) return;
+    const disc = mltcDiscoverFilters(this._hass, c.entity);
     this.innerHTML = `
       <div style="padding:10px;display:flex;flex-direction:column;gap:8px;font-size:12px">
         <div style="font-weight:700;color:#10b981">MyLife card v${MLTC_VERSION}</div>
@@ -556,10 +667,16 @@ class MyLifeTrackerCardEditor extends HTMLElement {
         <label>Max height px<input class="h" type="number" min="60" max="300" style="width:100%;margin-top:2px"/></label>
         <label><input class="hdr" type="checkbox"/> Header</label>
         <label><input class="sb" type="checkbox"/> Számlák</label>
+        ${this._filterBox("Számlák — háztartás", "bill_households", disc.households, c.bill_households)}
+        ${this._filterBox("Számlák — felhasználók", "bill_users", disc.users, c.bill_users)}
         ${this._colBox("Számla oszlopok", "bill", MLTC_BILL_COLS, c.bill_columns)}
         <label><input class="se" type="checkbox"/> Extra</label>
+        ${this._filterBox("Extra — háztartás", "extra_households", disc.households, c.extra_households)}
+        ${this._filterBox("Extra — felhasználók", "extra_users", disc.users, c.extra_users)}
         ${this._colBox("Extra oszlopok", "extra", MLTC_EXTRA_COLS, c.extra_columns)}
         <label><input class="sd" type="checkbox"/> Okmány</label>
+        ${this._filterBox("Okmány — felhasználó (id)", "doc_users", disc.users, c.doc_users)}
+        ${this._filterBox("Okmány — személy (név)", "doc_persons", disc.persons, c.doc_persons)}
         ${this._colBox("Okmány oszlopok", "doc", MLTC_DOC_COLS, c.doc_columns)}
       </div>`;
 
@@ -581,11 +698,11 @@ class MyLifeTrackerCardEditor extends HTMLElement {
       const el = q(`.${cls}`)?.closest("label");
       if (el) el.style.display = isCompact ? "none" : "";
     });
-    this.querySelectorAll("fieldset").forEach((fs) => {
+    this.querySelectorAll(".mltc-cols-fs").forEach((fs) => {
       fs.style.display = isCompact ? "none" : "";
     });
 
-    q(".e").onchange = (e) => this._set("entity", e.target.value);
+    q(".e").onchange = (e) => { this._set("entity", e.target.value); this._render(); };
     q(".layout").onchange = (e) => { this._set("layout", e.target.value); this._render(); };
     q(".theme").onchange = (e) => this._set("theme", e.target.value);
     q(".y").onchange = (e) => this._set("min_year", Number(e.target.value) || 2025);
@@ -595,6 +712,15 @@ class MyLifeTrackerCardEditor extends HTMLElement {
     q(".sb").onchange = (e) => this._set("show_bills", e.target.checked);
     q(".se").onchange = (e) => this._set("show_extra_costs", e.target.checked);
     q(".sd").onchange = (e) => this._set("show_documents", e.target.checked);
+
+    ["bill_households", "bill_users", "extra_households", "extra_users", "doc_users", "doc_persons"].forEach((key) => {
+      this.querySelectorAll(`input[data-fk="${key}"]`).forEach((el) => {
+        el.onchange = () => {
+          const vals = [...this.querySelectorAll(`input[data-fk="${key}"]:checked`)].map((x) => x.dataset.fv);
+          this._set(key, vals);
+        };
+      });
+    });
 
     ["bill", "extra", "doc"].forEach((p) => {
       const key = `${p}_columns`;

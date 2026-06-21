@@ -58,6 +58,9 @@ show_documents: false
 | `min_year` | `2025` | Hide items with billing year before this |
 | `max_rows` | `8` | Rows per section (full layout only) |
 | `max_height` | `120` | Scroll area height in px (full layout only) |
+| `bill_households` / `bill_users` | `[]` (all) | Filter számlák by household id and assigned user ids |
+| `extra_households` / `extra_users` | `[]` (all) | Filter extra costs by household and users |
+| `doc_users` / `doc_persons` | `[]` (all) | Filter okmányok by user id and/or person name |
 | `bill_columns` / `extra_columns` / `doc_columns` | see example | Customize table columns (full layout, UI editor) |
 
 ### Column keys
