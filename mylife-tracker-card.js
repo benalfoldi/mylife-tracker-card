@@ -1,7 +1,7 @@
 /**
  * MyLife Tracker Lovelace cards v1.5 — full table + compact glance
  */
-const MLTC_VERSION = "1.6.1";
+const MLTC_VERSION = "1.6.2";
 
 const MLTC_BILL_COLS = {
   type: { label: "Típus", w: "18%", chip: true },
@@ -283,10 +283,18 @@ function mltcFilterDocs(docs, users, persons) {
   });
 }
 
+function mltcLabel(map, id) {
+  if (id == null || id === "") return "";
+  const key = String(id);
+  return (map && map[key]) || key;
+}
+
 function mltcDiscoverFilters(hass, entity) {
   const out = { households: [], users: [], persons: [] };
   if (!hass || !entity) return out;
   const a = hass.states[entity]?.attributes || {};
+  const hhLabels = a.household_labels || {};
+  const userLabels = a.user_labels || {};
   const hhs = new Set();
   const users = new Set();
   const persons = new Set();
@@ -298,9 +306,11 @@ function mltcDiscoverFilters(hass, entity) {
     if (d.person) persons.add(String(d.person));
     if (d.user_id) users.add(String(d.user_id));
   });
-  out.households = [...hhs].sort().map((id) => ({ id, label: id }));
-  out.users = [...users].sort().map((id) => ({ id, label: id }));
-  out.persons = [...persons].sort().map((id) => ({ id, label: id }));
+  out.households = [...hhs].sort((x, y) => mltcLabel(hhLabels, x).localeCompare(mltcLabel(hhLabels, y), "hu"))
+    .map((id) => ({ id, label: mltcLabel(hhLabels, id) }));
+  out.users = [...users].sort((x, y) => mltcLabel(userLabels, x).localeCompare(mltcLabel(userLabels, y), "hu"))
+    .map((id) => ({ id, label: mltcLabel(userLabels, id) }));
+  out.persons = [...persons].sort((x, y) => x.localeCompare(y, "hu")).map((id) => ({ id, label: id }));
   return out;
 }
 
@@ -412,10 +422,10 @@ class MyLifeTrackerCard extends HTMLElement {
     return { rows: 2, columns: 12, min_rows: 2, min_columns: 6 };
   }
 
-  _billRow(b) {
+  _billRow(b, hhLabels) {
     return {
       type: b.type || "—",
-      household: b.household_id || "—",
+      household: mltcLabel(hhLabels, b.household_id) || "—",
       period: mltcPeriod(b.year, b.month),
       due_date: b.due_date ? String(b.due_date).slice(0, 10) : "—",
       amount: mltcMoney(b.amount, b.currency),
@@ -423,11 +433,11 @@ class MyLifeTrackerCard extends HTMLElement {
     };
   }
 
-  _extraRow(x) {
+  _extraRow(x, hhLabels) {
     return {
       description: (x.description || x.type || "—").slice(0, 32),
       type: x.type || "—",
-      household: x.household_id || "—",
+      household: mltcLabel(hhLabels, x.household_id) || "—",
       period: mltcPeriod(x.year, x.month),
       due_date: x.due_date ? String(x.due_date).slice(0, 10) : "—",
       amount: mltcMoney(x.amount, x.currency),
@@ -513,6 +523,7 @@ class MyLifeTrackerCard extends HTMLElement {
     }
 
     const a = st.attributes || {};
+    const hhLabels = a.household_labels || {};
     const minY = Number(cfg.min_year) || 2025;
     const maxR = Number(cfg.max_rows) || 8;
     const maxH = Number(cfg.max_height) || 120;
@@ -564,14 +575,14 @@ class MyLifeTrackerCard extends HTMLElement {
     if (cfg.show_bills !== false) {
       parts.push(this._panel(
         "Számlák",
-        mltcTable(MLTC_BILL_COLS, cfg.bill_columns, bills.slice(0, maxR).map((b) => this._billRow(b))),
+        mltcTable(MLTC_BILL_COLS, cfg.bill_columns, bills.slice(0, maxR).map((b) => this._billRow(b, hhLabels))),
         bills.length, maxR
       ));
     }
     if (cfg.show_extra_costs !== false) {
       parts.push(this._panel(
         "Extra költségek",
-        mltcTable(MLTC_EXTRA_COLS, cfg.extra_columns, extra.slice(0, maxR).map((x) => this._extraRow(x))),
+        mltcTable(MLTC_EXTRA_COLS, cfg.extra_columns, extra.slice(0, maxR).map((x) => this._extraRow(x, hhLabels))),
         extra.length, maxR, "panel-h--extra"
       ));
     }
@@ -782,14 +793,14 @@ function mltcEntitySuggestion(type, layout) {
 }
 
 function mltcRegisterCards() {
-  // IMPORTANT: never reassign window.customCards — HA keeps a reference to the
-  // original array; filter+assign breaks Community cards in the picker.
-  window.customCards = window.customCards || [];
-  const types = new Set(["mylife-tracker-card", "mylife-tracker-glance-card"]);
-  for (let i = window.customCards.length - 1; i >= 0; i -= 1) {
-    if (types.has(window.customCards[i].type)) window.customCards.splice(i, 1);
-  }
-  window.customCards.push({
+  // Never reassign window.customCards — HA holds a reference to the original array.
+  if (!window.customCards) window.customCards = [];
+  const upsert = (def) => {
+    const i = window.customCards.findIndex((c) => c && c.type === def.type);
+    if (i >= 0) window.customCards[i] = def;
+    else window.customCards.push(def);
+  };
+  upsert({
     type: "mylife-tracker-card",
     name: "MyLife Tracker",
     description: "Bills and documents table (full or compact layout)",
@@ -798,7 +809,7 @@ function mltcRegisterCards() {
     documentationURL: "https://github.com/benalfoldi/mylife-tracker-card",
     getEntitySuggestion: mltcEntitySuggestion("mylife-tracker-card", "full"),
   });
-  window.customCards.push({
+  upsert({
     type: "mylife-tracker-glance-card",
     name: "MyLife Tracker Glance",
     description: "Compact badge-only status tile",
@@ -807,7 +818,6 @@ function mltcRegisterCards() {
     documentationURL: "https://github.com/benalfoldi/mylife-tracker-card",
     getEntitySuggestion: mltcEntitySuggestion("mylife-tracker-glance-card"),
   });
-  console.info(`MyLife Tracker card v${MLTC_VERSION} registered (${window.customCards.length} community cards total)`);
 }
 
 mltcRegisterCards();
