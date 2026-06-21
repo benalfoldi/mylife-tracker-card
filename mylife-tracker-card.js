@@ -1,7 +1,33 @@
 /**
  * MyLife Tracker Lovelace cards v1.5 — full table + compact glance
  */
-const MLTC_VERSION = "1.6.3";
+const MLTC_VERSION = "1.6.4";
+
+function mltcPickDefaultEntity(hass, pool) {
+  const ids = [...new Set([
+    ...(pool || []),
+    ...(hass ? Object.keys(hass.states || {}) : []),
+  ])];
+  const status = ids.find((e) => e.includes("mylife_tracker") && e.endsWith("_status"));
+  if (status) return status;
+  const withData = ids.find((e) => e.includes("mylife_tracker") && mltcHasListData(hass?.states[e]?.attributes));
+  if (withData) return withData;
+  return ids.find((e) => e.includes("mylife_tracker")) || "sensor.mylife_tracker_status";
+}
+
+function mltcCollectLabelMaps(hass) {
+  const hhLabels = {};
+  const userLabels = {};
+  if (hass?.states) {
+    Object.entries(hass.states).forEach(([eid, st]) => {
+      if (!eid.includes("mylife_tracker")) return;
+      const a = st.attributes || {};
+      Object.assign(hhLabels, a.household_labels || {});
+      Object.assign(userLabels, a.user_labels || {});
+    });
+  }
+  return { hhLabels, userLabels };
+}
 
 const MLTC_BILL_COLS = {
   type: { label: "Típus", w: "18%", chip: true },
@@ -308,7 +334,11 @@ function mltcResolveDataEntity(hass, entity) {
 
 function mltcDataAttributes(hass, entity) {
   const id = mltcResolveDataEntity(hass, entity);
-  return hass?.states[id]?.attributes || {};
+  const a = { ...(hass?.states[id]?.attributes || {}) };
+  const maps = mltcCollectLabelMaps(hass);
+  a.household_labels = { ...maps.hhLabels, ...(a.household_labels || {}) };
+  a.user_labels = { ...maps.userLabels, ...(a.user_labels || {}) };
+  return a;
 }
 
 function mltcLabel(map, id) {
@@ -396,12 +426,7 @@ class MyLifeTrackerCard extends HTMLElement {
 
   static getStubConfig(hass, entities, entitiesFallback) {
     const pool = [...(entities || []), ...(entitiesFallback || [])];
-    const fromPool = pool.find((e) => e.includes("mylife_tracker") && e.endsWith("_status"))
-      || pool.find((e) => e.includes("mylife_tracker"));
-    const entity = fromPool
-      || (hass && Object.keys(hass.states || {}).find((e) => e.includes("mylife_tracker") && e.endsWith("_status")))
-      || (hass && Object.keys(hass.states || {}).find((e) => e.includes("mylife_tracker")))
-      || "sensor.mylife_tracker_status";
+    const entity = mltcPickDefaultEntity(hass, pool);
     return {
       entity,
       layout: "full",
@@ -703,10 +728,12 @@ class MyLifeTrackerCardEditor extends HTMLElement {
       : "Nincs adat — frissítsd az integrációt (deploy + HACS update), majd várj egy poll ciklust";
     const entityNote = disc.needsStatus
       ? `<div style="font-size:10px;color:#d97706;padding:4px 6px;background:#fffbeb;border-radius:6px">
-          Szűrők és táblázat: <strong>${mltcEsc(disc.dataEntity)}</strong>
-          (a ${mltcEsc(c.entity)} csak szám — ajánlott: Status entity)
+          Ajánlott entity: <strong>${mltcEsc(disc.dataEntity)}</strong>
+          <button type="button" class="fix-entity" style="margin-left:8px;font-size:10px">Átállítás</button>
         </div>`
-      : "";
+      : (Object.keys(mltcCollectLabelMaps(this._hass).userLabels).length === 0
+        ? `<div style="font-size:10px;color:#888">Név címkékhez: deploy + integráció frissítés, majd Refresh status</div>`
+        : "");
     this.innerHTML = `
       <div style="padding:10px;display:flex;flex-direction:column;gap:8px;font-size:12px">
         <div style="font-weight:700;color:#10b981">MyLife card v${MLTC_VERSION}</div>
@@ -762,6 +789,8 @@ class MyLifeTrackerCardEditor extends HTMLElement {
     });
 
     q(".e").onchange = (e) => { this._set("entity", e.target.value); this._render(); };
+    const fixBtn = q(".fix-entity");
+    if (fixBtn) fixBtn.onclick = () => { this._set("entity", disc.dataEntity); this._render(); };
     q(".layout").onchange = (e) => { this._set("layout", e.target.value); this._render(); };
     q(".theme").onchange = (e) => this._set("theme", e.target.value);
     q(".y").onchange = (e) => this._set("min_year", Number(e.target.value) || 2025);
@@ -830,7 +859,8 @@ customElements.define("mylife-tracker-glance-card", MyLifeTrackerGlanceCard);
 function mltcEntitySuggestion(type, layout) {
   return (hass, entityId) => {
     if (!entityId.includes("mylife_tracker")) return null;
-    const cfg = { type: `custom:${type}`, entity: entityId };
+    const dataEntity = mltcPickDefaultEntity(hass, [entityId]);
+    const cfg = { type: `custom:${type}`, entity: dataEntity };
     if (layout) cfg.layout = layout;
     return { config: cfg };
   };
