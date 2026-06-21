@@ -1,7 +1,7 @@
 /**
  * MyLife Tracker Lovelace cards v1.5 — full table + compact glance
  */
-const MLTC_VERSION = "1.5.0";
+const MLTC_VERSION = "1.5.1";
 
 const MLTC_BILL_COLS = {
   type: { label: "Típus", w: "18%", chip: true },
@@ -282,7 +282,6 @@ class MyLifeTrackerCard extends HTMLElement {
 
   static getStubConfig() {
     return {
-      type: "custom:mylife-tracker-card",
       entity: "sensor.mylife_tracker_status",
       layout: "full",
       min_year: 2025,
@@ -321,6 +320,13 @@ class MyLifeTrackerCard extends HTMLElement {
 
   getCardSize() {
     return this._config?.layout === "compact" ? 1 : 2;
+  }
+
+  getGridOptions() {
+    if (this._config?.layout === "compact") {
+      return { rows: 1, columns: 6, min_rows: 1, min_columns: 3 };
+    }
+    return { rows: 2, columns: 12, min_rows: 2, min_columns: 6 };
   }
 
   _billRow(b) {
@@ -612,7 +618,6 @@ class MyLifeTrackerGlanceCard extends MyLifeTrackerCard {
   static getStubConfig() {
     return {
       ...MyLifeTrackerCard.getStubConfig(),
-      type: "custom:mylife-tracker-glance-card",
       layout: "compact",
       show_documents: false,
     };
@@ -629,24 +634,42 @@ class MyLifeTrackerGlanceCard extends MyLifeTrackerCard {
   getCardSize() {
     return 1;
   }
+
+  getGridOptions() {
+    return { rows: 1, columns: 6, min_rows: 1, min_columns: 3 };
+  }
 }
 
 customElements.define("mylife-tracker-glance-card", MyLifeTrackerGlanceCard);
 
+function mltcEntitySuggestion(type, layout) {
+  return (hass, entityId) => {
+    if (!entityId.includes("mylife_tracker")) return null;
+    const cfg = { type: `custom:${type}`, entity: entityId };
+    if (layout) cfg.layout = layout;
+    return { config: cfg };
+  };
+}
+
+window.customCards = window.customCards || [];
 window.customCards = window.customCards.filter(
   (c) => c.type !== "mylife-tracker-card" && c.type !== "mylife-tracker-glance-card"
 );
 window.customCards.push({
   type: "mylife-tracker-card",
-  name: `MyLife Tracker Card v${MLTC_VERSION}`,
-  description: "Full table or compact layout",
+  name: "MyLife Tracker",
+  description: "Bills and documents table (full or compact layout)",
   preview: true,
   version: MLTC_VERSION,
+  documentationURL: "https://github.com/benalfoldi/mylife-tracker-card",
+  getEntitySuggestion: mltcEntitySuggestion("mylife-tracker-card", "full"),
 });
 window.customCards.push({
   type: "mylife-tracker-glance-card",
-  name: `MyLife Tracker Glance v${MLTC_VERSION}`,
-  description: "Compact badge-only MyLife status",
+  name: "MyLife Tracker Glance",
+  description: "Compact badge-only status tile",
   preview: true,
   version: MLTC_VERSION,
+  documentationURL: "https://github.com/benalfoldi/mylife-tracker-card",
+  getEntitySuggestion: mltcEntitySuggestion("mylife-tracker-glance-card"),
 });
