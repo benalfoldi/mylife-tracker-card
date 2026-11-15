@@ -75,17 +75,24 @@ show_documents: false
 
 Point each card at `sensor.mylife_tracker_education` (created by integration v1.1+).
 
-### Múlt heti osztályzatok
+### Heti osztályzatok (compact)
 
 ```yaml
 type: custom:mylife-edu-grades-card
 entity: sensor.mylife_tracker_education
 ```
 
-### Következő hét házi
+### Házi (compact — today through next Sunday)
 
 ```yaml
 type: custom:mylife-edu-homework-card
+entity: sensor.mylife_tracker_education
+```
+
+### Combined grades + házi (compact)
+
+```yaml
+type: custom:mylife-edu-combo-card
 entity: sensor.mylife_tracker_education
 ```
 
