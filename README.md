@@ -89,13 +89,6 @@ type: custom:mylife-edu-homework-card
 entity: sensor.mylife_tracker_education
 ```
 
-### Combined grades + házi (compact)
-
-```yaml
-type: custom:mylife-edu-combo-card
-entity: sensor.mylife_tracker_education
-```
-
 ### Órarend (current week)
 
 Shared left time column, F|B side-by-side, striped period rows:

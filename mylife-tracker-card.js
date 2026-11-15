@@ -1,7 +1,7 @@
 /**
  * MyLife Tracker Lovelace cards — bills/docs + education (grades / házi / órarend)
  */
-const MLTC_VERSION = "1.8.0";
+const MLTC_VERSION = "1.8.2";
 
 function mltcPickDefaultEntity(hass, pool) {
   const ids = [...new Set([
@@ -935,63 +935,57 @@ function mleduEduStyles(dark) {
       --muted: ${dark ? "#8b949e" : "#64748b"};
       --line: ${dark ? "rgba(255,255,255,.12)" : "rgba(15,23,42,.12)"};
       --dayline: ${dark ? "rgba(255,255,255,.28)" : "rgba(15,23,42,.28)"};
-      font: 12px/1.3 'Segoe UI', Roboto, system-ui, sans-serif;
+      font: 11px/1.25 'Segoe UI', Roboto, system-ui, sans-serif;
       color: var(--text); background: var(--bg);
-      padding: 10px;
+      padding: 8px;
     }
     .topline {
-      display:flex; align-items:baseline; justify-content:space-between; gap:8px;
-      margin-bottom: 8px;
+      display:flex; align-items:baseline; justify-content:space-between; gap:6px;
+      margin-bottom: 6px; padding: 0; background: transparent; border: 0;
     }
-    .topline-title { font-size: 11px; font-weight: 750; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-    .topline-sub { font-size: 11px; color: var(--muted); font-weight: 600; }
-    .section { margin-top: 8px; }
-    .section:first-child { margin-top: 0; }
-    .section-h {
-      font-size: 10px; font-weight: 750; color: var(--muted); text-transform: uppercase;
-      letter-spacing: .04em; margin-bottom: 5px;
-    }
+    .topline-title { font-size: 10px; font-weight: 750; color: var(--muted); letter-spacing: .03em; }
+    .topline-sub { font-size: 10px; color: var(--muted); font-weight: 600; }
+    .topline-ver { font-size: 9px; color: var(--muted); opacity: .7; margin-left: 4px; font-weight: 600; }
     .split {
-      display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px;
+      display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 6px;
     }
     .split:has(> :only-child) { grid-template-columns: 1fr; }
     .pane {
       --kid: #185fa5;
-      min-width: 0; border-radius: 10px; padding: 7px;
-      background: color-mix(in srgb, var(--kid) 9%, var(--bg));
-      border: 1px solid color-mix(in srgb, var(--kid) 24%, var(--line));
-      border-top: 2px solid var(--kid);
-      display: flex; flex-direction: column; gap: 5px;
+      min-width: 0; border-radius: 8px; padding: 5px 6px;
+      background: color-mix(in srgb, var(--kid) 8%, var(--bg));
+      border: 1px solid color-mix(in srgb, var(--kid) 22%, var(--line));
+      border-left: 3px solid var(--kid);
+      display: flex; flex-direction: column; gap: 3px;
     }
     .kidname {
-      font-size: 12px; font-weight: 780; color: var(--kid);
-      display: flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 780; color: var(--kid);
+      display: flex; align-items: center; gap: 4px;
     }
     .kidname::before {
-      content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--kid);
+      content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--kid);
     }
     .count {
-      margin-left: auto; font-size: 10px; font-weight: 700; color: var(--muted);
-      background: var(--bg); border-radius: 999px; padding: 1px 6px;
+      margin-left: auto; font-size: 9px; font-weight: 700; color: var(--muted);
+      background: var(--bg); border-radius: 999px; padding: 0 5px;
     }
     .chip, .hw {
       --kid: #185fa5;
-      display: flex; align-items: center; justify-content: space-between; gap: 6px;
-      width: 100%; border: 0; border-radius: 6px; text-align: left;
-      padding: 4px 6px; background: var(--bg); border-left: 3px solid var(--kid);
-      color: var(--text); font: inherit;
+      display: flex; align-items: center; justify-content: space-between; gap: 4px;
+      width: 100%; border: 0; border-radius: 5px; text-align: left;
+      padding: 2px 4px; background: transparent; color: var(--text); font: inherit;
     }
-    .hw { display: block; }
+    .hw { display: block; padding: 2px 0; }
     .sub { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; font-size: 11px; }
     .val { font-weight: 800; color: var(--kid); flex: 0 0 auto; font-size: 11px; }
-    .hw-top { display: flex; justify-content: space-between; gap: 6px; align-items: baseline; }
-    .due { font-size: 10px; color: var(--muted); flex: 0 0 auto; }
+    .hw-top { display: flex; justify-content: space-between; gap: 4px; align-items: baseline; }
+    .due { font-size: 9px; color: var(--muted); flex: 0 0 auto; }
     .prev {
-      margin-top: 2px; font-size: 10px; color: var(--muted); line-height: 1.3;
+      margin-top: 1px; font-size: 9px; color: var(--muted); line-height: 1.25;
       display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
     }
-    .empty { font-size: 11px; color: var(--muted); }
-    .list { display: flex; flex-direction: column; gap: 4px; }
+    .empty { font-size: 10px; color: var(--muted); }
+    .list { display: flex; flex-direction: column; gap: 1px; }
     .tt-wrap { overflow-x: auto; }
     .tt-week {
       min-width: 520px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
@@ -1079,7 +1073,7 @@ class MyLifeEduCardBase extends HTMLElement {
       <ha-card>
         <div class="card">
           <div class="topline">
-            <div class="topline-title">${mleduEsc(title)}</div>
+            <div class="topline-title">${mleduEsc(title)}<span class="topline-ver">v${MLTC_VERSION}</span></div>
             ${subtitle ? `<div class="topline-sub">${mleduEsc(subtitle)}</div>` : ""}
           </div>
           ${bodyHtml}
@@ -1167,43 +1161,6 @@ class MyLifeEduHomeworkCard extends MyLifeEduCardBase {
       return;
     }
     this._renderShell("Házi", range, `<div class="split">${this._hwPanes(students, hw)}</div>`);
-  }
-}
-
-class MyLifeEduComboCard extends MyLifeEduCardBase {
-  static getStubConfig(hass) {
-    return { entity: mleduPickEntity(hass, []) };
-  }
-
-  static getConfigElement() {
-    return document.createElement("mylife-edu-card-editor");
-  }
-
-  getCardSize() {
-    return 3;
-  }
-
-  _render() {
-    const attrs = mleduAttrs(this._hass, this._entityId());
-    const students = mleduStudents(attrs);
-    const grades = mleduGrades(attrs);
-    const hw = mleduHomework(attrs);
-    const gRange = mleduFmtRange(mleduGradesRange(attrs));
-    const hRange = mleduFmtRange(attrs.next_week_range);
-    if (!students.length) {
-      this._renderShell("Iskola", "", `<div class="empty">Nincs diák adat</div>`);
-      return;
-    }
-    const body = `
-      <div class="section">
-        <div class="section-h">Osztályzatok ${gRange ? `· ${mleduEsc(gRange)}` : ""}</div>
-        <div class="split">${this._gradePanes(students, grades)}</div>
-      </div>
-      <div class="section">
-        <div class="section-h">Házi ${hRange ? `· ${mleduEsc(hRange)}` : ""}</div>
-        <div class="split">${this._hwPanes(students, hw)}</div>
-      </div>`;
-    this._renderShell("Iskola", "", body);
   }
 }
 
@@ -1324,11 +1281,13 @@ class MyLifeEduEntityEditor extends HTMLElement {
   }
 }
 
-customElements.define("mylife-edu-grades-card", MyLifeEduGradesCard);
-customElements.define("mylife-edu-homework-card", MyLifeEduHomeworkCard);
-customElements.define("mylife-edu-combo-card", MyLifeEduComboCard);
-customElements.define("mylife-edu-timetable-card", MyLifeEduTimetableCard);
-customElements.define("mylife-edu-card-editor", MyLifeEduEntityEditor);
+function mleduDefine(tag, cls) {
+  if (!customElements.get(tag)) customElements.define(tag, cls);
+}
+mleduDefine("mylife-edu-grades-card", MyLifeEduGradesCard);
+mleduDefine("mylife-edu-homework-card", MyLifeEduHomeworkCard);
+mleduDefine("mylife-edu-timetable-card", MyLifeEduTimetableCard);
+mleduDefine("mylife-edu-card-editor", MyLifeEduEntityEditor);
 
 function mltcEntitySuggestion(type, layout) {
   return (hass, entityId) => {
@@ -1386,15 +1345,9 @@ function mltcRegisterCards() {
     documentationURL: "https://github.com/benalfoldi/mylife-tracker-card",
     getEntitySuggestion: mltcEntitySuggestion("mylife-edu-homework-card"),
   });
-  upsert({
-    type: "mylife-edu-combo-card",
-    name: "MyLife Edu Osztályzatok + Házi",
-    description: "Compact combined grades + homework",
-    preview: true,
-    version: MLTC_VERSION,
-    documentationURL: "https://github.com/benalfoldi/mylife-tracker-card",
-    getEntitySuggestion: mltcEntitySuggestion("mylife-edu-combo-card"),
-  });
+  // Remove combo from picker if an older build registered it
+  const comboIdx = window.customCards.findIndex((c) => c && c.type === "mylife-edu-combo-card");
+  if (comboIdx >= 0) window.customCards.splice(comboIdx, 1);
   upsert({
     type: "mylife-edu-timetable-card",
     name: "MyLife Edu Órarend",
