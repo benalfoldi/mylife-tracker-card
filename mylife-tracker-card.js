@@ -1,7 +1,7 @@
 /**
- * MyLife Tracker Lovelace cards v1.5 — full table + compact glance
+ * MyLife Tracker Lovelace cards — bills/docs + education (grades / házi / órarend)
  */
-const MLTC_VERSION = "1.6.4";
+const MLTC_VERSION = "1.7.0";
 
 function mltcPickDefaultEntity(hass, pool) {
   const ids = [...new Set([
@@ -856,10 +856,423 @@ class MyLifeTrackerGlanceCard extends MyLifeTrackerCard {
 
 customElements.define("mylife-tracker-glance-card", MyLifeTrackerGlanceCard);
 
+/* ─── Education cards (grades / homework / timetable) ─────────────────────── */
+
+function mleduPickEntity(hass, pool) {
+  const ids = [...new Set([...(pool || []), ...(hass ? Object.keys(hass.states || {}) : [])])];
+  const edu = ids.find((e) => e.includes("mylife_tracker") && e.endsWith("_education"));
+  if (edu) return edu;
+  return mltcPickDefaultEntity(hass, pool);
+}
+
+function mleduEsc(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function mleduFmtDate(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+    return d.toLocaleDateString("hu-HU", { month: "short", day: "numeric" });
+  } catch (_e) {
+    return String(iso).slice(0, 10);
+  }
+}
+
+function mleduFmtRange(range) {
+  if (!range?.start) return "";
+  return `${mleduFmtDate(range.start)} – ${mleduFmtDate(range.end)}`;
+}
+
+function mleduAttrs(hass, entity) {
+  return hass?.states?.[entity]?.attributes || {};
+}
+
+function mleduStudents(attrs) {
+  return Array.isArray(attrs.students) ? attrs.students : [];
+}
+
+function mleduStudentMap(attrs) {
+  const map = {};
+  mleduStudents(attrs).forEach((s) => {
+    if (s?.id) map[s.id] = s;
+  });
+  return map;
+}
+
+function mleduEduStyles(dark) {
+  return `
+    :host { display: block; }
+    * { box-sizing: border-box; }
+    ha-card {
+      display: block; overflow: hidden; border-radius: 14px;
+      --ha-card-border-width: 0px;
+      --ha-card-box-shadow: 0 4px 18px rgba(11,19,43,${dark ? ".55" : ".14"});
+    }
+    .card {
+      --bg: ${dark ? "#161b22" : "#ffffff"};
+      --bg2: ${dark ? "#1c2230" : "#f8fafc"};
+      --text: ${dark ? "#e6edf3" : "#1e293b"};
+      --muted: ${dark ? "#8b949e" : "#64748b"};
+      --line: ${dark ? "rgba(255,255,255,.12)" : "rgba(15,23,42,.12)"};
+      --dayline: ${dark ? "rgba(255,255,255,.28)" : "rgba(15,23,42,.28)"};
+      font: 12px/1.35 'Segoe UI', Roboto, system-ui, sans-serif;
+      color: var(--text); background: var(--bg);
+    }
+    .hdr {
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding: 12px 14px;
+      background: linear-gradient(135deg, #0b132b 0%, #102a43 100%);
+      color: #fff;
+    }
+    .hdr-title { font-size: 13px; font-weight: 750; letter-spacing: .02em; }
+    .hdr-sub { font-size: 11px; opacity: .75; margin-top: 2px; }
+    .body { padding: 12px; }
+    .split {
+      display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px;
+    }
+    .split:has(> :only-child) { grid-template-columns: 1fr; }
+    .pane {
+      --kid: #185fa5;
+      min-width: 0; border-radius: 12px; padding: 10px;
+      background: color-mix(in srgb, var(--kid) 10%, var(--bg));
+      border: 1px solid color-mix(in srgb, var(--kid) 28%, var(--line));
+      border-top: 3px solid var(--kid);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .kidname {
+      font-size: 13px; font-weight: 780; color: var(--kid);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .kidname::before {
+      content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--kid);
+    }
+    .count {
+      margin-left: auto; font-size: 11px; font-weight: 700; color: var(--muted);
+      background: var(--bg); border-radius: 999px; padding: 2px 7px;
+    }
+    .chip, .hw {
+      --kid: #185fa5;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      width: 100%; border: 0; border-radius: 8px; text-align: left;
+      padding: 7px 9px; background: var(--bg); border-left: 3px solid var(--kid);
+      color: var(--text); font: inherit;
+    }
+    .hw { display: block; }
+    .sub { min-width: 0; flex: 1; overflow-wrap: anywhere; font-weight: 650; }
+    .val { font-weight: 800; color: var(--kid); flex: 0 0 auto; }
+    .hw-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+    .due { font-size: 11px; color: var(--muted); flex: 0 0 auto; }
+    .prev {
+      margin-top: 4px; font-size: 11px; color: var(--muted); line-height: 1.35;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .empty { font-size: 12px; color: var(--muted); }
+    .list { display: flex; flex-direction: column; gap: 6px; }
+    .tt-wrap { overflow-x: auto; }
+    .tt-week {
+      min-width: 520px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    }
+    .tt-row {
+      display: grid; grid-template-columns: 42px repeat(5, minmax(0,1fr));
+      align-items: stretch;
+    }
+    .tt-head { background: var(--bg2); border-bottom: 1px solid var(--line); }
+    .tt-dow, .tt-day {
+      text-align: center; padding: 6px 3px; font-weight: 650; color: var(--muted);
+      border-right: 1px solid var(--dayline);
+    }
+    .tt-dow:last-child, .tt-day:last-child, .tt-cell:last-child { border-right: 0; }
+    .tt-daynum { font-size: 12px; font-weight: 750; color: var(--text); }
+    .tt-kids-h {
+      display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 2px; margin-top: 4px;
+    }
+    .tt-kidh {
+      --kid: #185fa5; font-size: 9px; font-weight: 800; color: #fff; background: var(--kid);
+      border-radius: 4px; padding: 2px 0;
+    }
+    .tt-time {
+      display: flex; align-items: center; justify-content: flex-end;
+      padding: 0 6px; font-size: 10px; font-weight: 750; color: var(--muted);
+      border-right: 1px solid var(--line); background: var(--bg2);
+      font-variant-numeric: tabular-nums;
+    }
+    .tt-period { border-bottom: 1px solid var(--line); min-height: 30px; }
+    .tt-period:nth-child(even) { background: color-mix(in srgb, var(--text) 4%, var(--bg)); }
+    .tt-period:nth-child(even) .tt-time {
+      background: color-mix(in srgb, var(--text) 4%, var(--bg2));
+    }
+    .tt-cell {
+      min-width: 0; padding: 3px; border-right: 1px solid var(--dayline);
+      display: flex; flex-direction: column; gap: 2px; justify-content: center;
+    }
+    .tt-kids {
+      display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 2px; width: 100%;
+    }
+    .tt-slot {
+      --kid: #185fa5; display: block; width: 100%; border: 0; border-radius: 5px;
+      padding: 3px 4px; font: inherit; font-size: 9px; font-weight: 700; text-align: left;
+      background: color-mix(in srgb, var(--kid) 16%, #fff); color: var(--text);
+      border-left: 2px solid var(--kid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .tt-empty { font-size: 9px; color: var(--muted); text-align: center; opacity: .45; padding: 3px 0; }
+    .tt-muted { opacity: .55; }
+    @media (max-width: 560px) {
+      .split { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+    }
+  `;
+}
+
+class MyLifeEduCardBase extends HTMLElement {
+  setConfig(config) {
+    if (!config) throw new Error("Invalid config");
+    this._config = { theme: "brand", ...config };
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  getCardSize() {
+    return 3;
+  }
+
+  _entityId() {
+    return this._config.entity || mleduPickEntity(this._hass, []);
+  }
+
+  _renderShell(title, subtitle, bodyHtml) {
+    const dark = mltcIsDark(this._hass);
+    if (!this.shadowRoot) this.attachShadow({ mode: "open" });
+    this.shadowRoot.innerHTML = `
+      <style>${mleduEduStyles(dark)}</style>
+      <ha-card>
+        <div class="card">
+          <div class="hdr">
+            <div>
+              <div class="hdr-title">${mleduEsc(title)}</div>
+              ${subtitle ? `<div class="hdr-sub">${mleduEsc(subtitle)}</div>` : ""}
+            </div>
+            <div style="opacity:.7">${mltcLogoSvg()}</div>
+          </div>
+          <div class="body">${bodyHtml}</div>
+        </div>
+      </ha-card>
+    `;
+  }
+}
+
+class MyLifeEduGradesCard extends MyLifeEduCardBase {
+  static getStubConfig(hass) {
+    return { entity: mleduPickEntity(hass, []) };
+  }
+
+  static getConfigElement() {
+    return document.createElement("mylife-edu-card-editor");
+  }
+
+  _render() {
+    const entity = this._entityId();
+    const attrs = mleduAttrs(this._hass, entity);
+    const students = mleduStudents(attrs);
+    const grades = Array.isArray(attrs.last_week_grades) ? attrs.last_week_grades : [];
+    const range = mleduFmtRange(attrs.last_week_range);
+    if (!students.length) {
+      this._renderShell("Múlt heti osztályzatok", range, `<div class="empty">Nincs diák adat</div>`);
+      return;
+    }
+    const panes = students.map((s) => {
+      const list = grades.filter((g) => g.student_id === s.id);
+      const chips = list.length
+        ? list.map((g) => `
+            <div class="chip" style="--kid:${mleduEsc(s.color || "#185fa5")}">
+              <span class="sub">${mleduEsc(g.subject || "Értékelés")}</span>
+              <span class="val">${mleduEsc(g.value_text || "—")}</span>
+            </div>`).join("")
+        : `<div class="empty">Nincs új</div>`;
+      return `<div class="pane" style="--kid:${mleduEsc(s.color || "#185fa5")}">
+        <div class="kidname">${mleduEsc(s.name || "Gyerek")}<span class="count">${list.length}</span></div>
+        <div class="list">${chips}</div>
+      </div>`;
+    }).join("");
+    this._renderShell("Múlt heti osztályzatok", range, `<div class="split">${panes}</div>`);
+  }
+}
+
+class MyLifeEduHomeworkCard extends MyLifeEduCardBase {
+  static getStubConfig(hass) {
+    return { entity: mleduPickEntity(hass, []) };
+  }
+
+  static getConfigElement() {
+    return document.createElement("mylife-edu-card-editor");
+  }
+
+  _render() {
+    const entity = this._entityId();
+    const attrs = mleduAttrs(this._hass, entity);
+    const students = mleduStudents(attrs);
+    const hw = Array.isArray(attrs.next_week_homework) ? attrs.next_week_homework : [];
+    const range = mleduFmtRange(attrs.next_week_range);
+    if (!students.length) {
+      this._renderShell("Következő hét házi", range, `<div class="empty">Nincs diák adat</div>`);
+      return;
+    }
+    const panes = students.map((s) => {
+      const list = hw.filter((h) => h.student_id === s.id);
+      const items = list.length
+        ? list.map((h) => `
+            <div class="hw" style="--kid:${mleduEsc(s.color || "#185fa5")}">
+              <div class="hw-top">
+                <span class="sub">${mleduEsc(h.subject || "Házi")}</span>
+                <span class="due">${mleduEsc(mleduFmtDate(h.deadline))}</span>
+              </div>
+              ${h.preview ? `<div class="prev">${mleduEsc(h.preview)}</div>` : ""}
+            </div>`).join("")
+        : `<div class="empty">Nincs házi</div>`;
+      return `<div class="pane" style="--kid:${mleduEsc(s.color || "#185fa5")}">
+        <div class="kidname">${mleduEsc(s.name || "Gyerek")}<span class="count">${list.length}</span></div>
+        <div class="list">${items}</div>
+      </div>`;
+    }).join("");
+    this._renderShell("Következő hét házi", range, `<div class="split">${panes}</div>`);
+  }
+}
+
+class MyLifeEduTimetableCard extends MyLifeEduCardBase {
+  static getStubConfig(hass) {
+    return { entity: mleduPickEntity(hass, []) };
+  }
+
+  static getConfigElement() {
+    return document.createElement("mylife-edu-card-editor");
+  }
+
+  getCardSize() {
+    return 5;
+  }
+
+  _render() {
+    const entity = this._entityId();
+    const attrs = mleduAttrs(this._hass, entity);
+    const students = mleduStudents(attrs);
+    const lessons = Array.isArray(attrs.timetable_week) ? attrs.timetable_week : [];
+    const range = mleduFmtRange(attrs.timetable_week_range);
+    const split = students.length > 1;
+    const weekdays = ["H", "K", "Sze", "Cs", "P"];
+    const start = attrs.timetable_week_range?.start
+      ? new Date(attrs.timetable_week_range.start + "T12:00:00")
+      : null;
+
+    if (!lessons.length) {
+      this._renderShell("Órarend", range, `<div class="empty">Nincs óra ezen a héten</div>`);
+      return;
+    }
+
+    const days = weekdays.map((label, i) => {
+      const d = start ? new Date(start) : null;
+      if (d) d.setDate(d.getDate() + i);
+      const key = d
+        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+        : "";
+      return { label, key, dayNum: d ? d.getDate() : "" };
+    });
+
+    const times = [...new Set(lessons.map((l) => l.time).filter(Boolean))].sort();
+    const byDay = {};
+    lessons.forEach((l) => {
+      (byDay[l.day] = byDay[l.day] || []).push(l);
+    });
+
+    const slot = (lesson, kid) => {
+      if (!lesson) return `<div class="tt-empty">—</div>`;
+      const color = kid?.color || "#185fa5";
+      const label = `${lesson.period != null ? lesson.period + ". " : ""}${lesson.subject || "Óra"}`;
+      return `<div class="tt-slot${lesson.cancelled ? " tt-muted" : ""}" style="--kid:${mleduEsc(color)}" title="${mleduEsc(label)}">${mleduEsc(label)}</div>`;
+    };
+
+    const dayHead = days.map((d) => {
+      const kidh = split
+        ? `<div class="tt-kids-h">${students.map((s) =>
+          `<div class="tt-kidh" style="--kid:${mleduEsc(s.color || "#185fa5")}">${mleduEsc(s.short || "?")}</div>`
+        ).join("")}</div>`
+        : "";
+      return `<div class="tt-day"><div class="tt-dow">${d.label}</div><div class="tt-daynum">${d.dayNum}</div>${kidh}</div>`;
+    }).join("");
+
+    const rows = times.map((t) => {
+      const cells = days.map((d) => {
+        const list = byDay[d.key] || [];
+        if (!split) {
+          const lesson = list.find((l) => l.time === t) || null;
+          const kid = students.find((s) => s.id === lesson?.student_id);
+          return `<div class="tt-cell">${slot(lesson, kid)}</div>`;
+        }
+        const cellsKids = students.map((s) => {
+          const lesson = list.find((l) => l.student_id === s.id && l.time === t) || null;
+          return slot(lesson, s);
+        }).join("");
+        return `<div class="tt-cell"><div class="tt-kids">${cellsKids}</div></div>`;
+      }).join("");
+      return `<div class="tt-row tt-period"><div class="tt-time">${mleduEsc(t)}</div>${cells}</div>`;
+    }).join("");
+
+    const html = `<div class="tt-wrap"><div class="tt-week">
+      <div class="tt-row tt-head"><div class="tt-time"></div>${dayHead}</div>
+      ${rows}
+    </div></div>`;
+    this._renderShell("Órarend", range, html);
+  }
+}
+
+class MyLifeEduEntityEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = { ...config };
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  _render() {
+    if (!this._hass) return;
+    const entities = Object.keys(this._hass.states || {})
+      .filter((e) => e.startsWith("sensor.") && e.includes("mylife_tracker"))
+      .sort();
+    const cur = this._config?.entity || mleduPickEntity(this._hass, entities);
+    this.innerHTML = `
+      <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+        <label style="font-size:12px;font-weight:650">Entity</label>
+        <select class="edu-ent">
+          ${entities.map((e) => `<option value="${e}" ${e === cur ? "selected" : ""}>${e}</option>`).join("")}
+        </select>
+      </div>`;
+    this.querySelector(".edu-ent").onchange = (ev) => {
+      this._config = { ...this._config, entity: ev.target.value };
+      this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config } }));
+    };
+  }
+}
+
+customElements.define("mylife-edu-grades-card", MyLifeEduGradesCard);
+customElements.define("mylife-edu-homework-card", MyLifeEduHomeworkCard);
+customElements.define("mylife-edu-timetable-card", MyLifeEduTimetableCard);
+customElements.define("mylife-edu-card-editor", MyLifeEduEntityEditor);
+
 function mltcEntitySuggestion(type, layout) {
   return (hass, entityId) => {
     if (!entityId.includes("mylife_tracker")) return null;
-    const dataEntity = mltcPickDefaultEntity(hass, [entityId]);
+    const dataEntity = type.startsWith("mylife-edu-")
+      ? mleduPickEntity(hass, [entityId])
+      : mltcPickDefaultEntity(hass, [entityId]);
     const cfg = { type: `custom:${type}`, entity: dataEntity };
     if (layout) cfg.layout = layout;
     return { config: cfg };
@@ -891,6 +1304,33 @@ function mltcRegisterCards() {
     version: MLTC_VERSION,
     documentationURL: "https://github.com/benalfoldi/mylife-tracker-card",
     getEntitySuggestion: mltcEntitySuggestion("mylife-tracker-glance-card"),
+  });
+  upsert({
+    type: "mylife-edu-grades-card",
+    name: "MyLife Edu Osztályzatok",
+    description: "Múlt heti osztályzatok tile (per kid)",
+    preview: true,
+    version: MLTC_VERSION,
+    documentationURL: "https://github.com/benalfoldi/mylife-tracker-card",
+    getEntitySuggestion: mltcEntitySuggestion("mylife-edu-grades-card"),
+  });
+  upsert({
+    type: "mylife-edu-homework-card",
+    name: "MyLife Edu Házi",
+    description: "Következő hét házi tile (per kid)",
+    preview: true,
+    version: MLTC_VERSION,
+    documentationURL: "https://github.com/benalfoldi/mylife-tracker-card",
+    getEntitySuggestion: mltcEntitySuggestion("mylife-edu-homework-card"),
+  });
+  upsert({
+    type: "mylife-edu-timetable-card",
+    name: "MyLife Edu Órarend",
+    description: "Heti órarend calendar (shared times, F|B split)",
+    preview: true,
+    version: MLTC_VERSION,
+    documentationURL: "https://github.com/benalfoldi/mylife-tracker-card",
+    getEntitySuggestion: mltcEntitySuggestion("mylife-edu-timetable-card"),
   });
 }
 

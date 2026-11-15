@@ -1,8 +1,8 @@
 # MyLife Tracker Card
 
-Lovelace cards for the [MyLife Tracker Home Assistant integration](https://github.com/benalfoldi/mylife-tracker-home-assistant): a **full table** card and a **compact glance** card.
+Lovelace cards for the [MyLife Tracker Home Assistant integration](https://github.com/benalfoldi/mylife-tracker-home-assistant): bills/docs cards plus **education** cards (múlt heti osztályzatok, következő hét házi, órarend).
 
-Requires the integration to be installed and configured with *your* MyLife Tracker server URL and API key.
+Requires the integration to be installed and configured with *your* MyLife Tracker server URL and API key. Integration **v1.1.0+** exposes `sensor.mylife_tracker_education`.
 
 ## Install via HACS
 
@@ -71,6 +71,33 @@ show_documents: false
 
 **Documents:** `name`, `person`, `type`, `date`, `days`
 
+## Education cards (v1.7+)
+
+Point each card at `sensor.mylife_tracker_education` (created by integration v1.1+).
+
+### Múlt heti osztályzatok
+
+```yaml
+type: custom:mylife-edu-grades-card
+entity: sensor.mylife_tracker_education
+```
+
+### Következő hét házi
+
+```yaml
+type: custom:mylife-edu-homework-card
+entity: sensor.mylife_tracker_education
+```
+
+### Órarend (current week)
+
+Shared left time column, F|B side-by-side, striped period rows:
+
+```yaml
+type: custom:mylife-edu-timetable-card
+entity: sensor.mylife_tracker_education
+```
+
 ## Requires
 
-- [MyLife Tracker integration](https://github.com/benalfoldi/mylife-tracker-home-assistant) installed in Home Assistant
+- [MyLife Tracker integration](https://github.com/benalfoldi/mylife-tracker-home-assistant) installed in Home Assistant (v1.1.0+ for education cards)
