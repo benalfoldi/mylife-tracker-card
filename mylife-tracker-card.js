@@ -1,7 +1,7 @@
 /**
  * MyLife Tracker Lovelace cards — bills/docs + education (grades / házi / órarend)
  */
-const MLTC_VERSION = "1.7.0";
+const MLTC_VERSION = "1.7.1";
 
 function mltcPickDefaultEntity(hass, pool) {
   const ids = [...new Set([
@@ -988,6 +988,12 @@ function mleduEduStyles(dark) {
       border-right: 1px solid var(--dayline);
     }
     .tt-dow:last-child, .tt-day:last-child, .tt-cell:last-child { border-right: 0; }
+    .tt-day:nth-child(even), .tt-cell:nth-child(even) {
+      background: color-mix(in srgb, var(--text) 4%, var(--bg));
+    }
+    .tt-period:nth-child(even) .tt-cell:nth-child(even) {
+      background: color-mix(in srgb, var(--text) 8%, var(--bg));
+    }
     .tt-daynum { font-size: 12px; font-weight: 750; color: var(--text); }
     .tt-kids-h {
       display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 2px; margin-top: 4px;
