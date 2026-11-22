@@ -1,7 +1,7 @@
 /**
  * MyLife Tracker Lovelace cards — bills/docs + education (grades / házi / órarend)
  */
-const MLTC_VERSION = "1.8.2";
+const MLTC_VERSION = "1.8.3";
 
 function mltcPickDefaultEntity(hass, pool) {
   const ids = [...new Set([
@@ -975,6 +975,7 @@ function mleduEduStyles(dark) {
       width: 100%; border: 0; border-radius: 5px; text-align: left;
       padding: 2px 4px; background: transparent; color: var(--text); font: inherit;
     }
+    .chip-note { border-left: 2px dashed var(--kid); padding-left: 4px; }
     .hw { display: block; padding: 2px 0; }
     .sub { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; font-size: 11px; }
     .val { font-weight: 800; color: var(--kid); flex: 0 0 auto; font-size: 11px; }
@@ -1086,11 +1087,17 @@ class MyLifeEduCardBase extends HTMLElement {
     return students.map((s) => {
       const list = grades.filter((g) => g.student_id === s.id);
       const chips = list.length
-        ? list.map((g) => `
-            <div class="chip" style="--kid:${mleduEsc(s.color || "#185fa5")}">
-              <span class="sub">${mleduEsc(g.subject || "Értékelés")}</span>
-              <span class="val">${mleduEsc(g.value_text || "—")}</span>
-            </div>`).join("")
+        ? list.map((g) => {
+            const note = g.kind === "note";
+            const sub = note ? (g.value_text || g.type || "Feljegyzés") : (g.subject || "Értékelés");
+            const val = note
+              ? (g.subject && g.subject !== sub ? g.subject : (g.theme || "").slice(0, 28) || "·")
+              : (g.value_text || "—");
+            return `<div class="chip${note ? " chip-note" : ""}" style="--kid:${mleduEsc(s.color || "#185fa5")}">
+              <span class="sub">${mleduEsc(sub)}</span>
+              <span class="val">${mleduEsc(val)}</span>
+            </div>`;
+          }).join("")
         : `<div class="empty">Nincs új</div>`;
       return `<div class="pane" style="--kid:${mleduEsc(s.color || "#185fa5")}">
         <div class="kidname">${mleduEsc(s.name || "Gyerek")}<span class="count">${list.length}</span></div>
