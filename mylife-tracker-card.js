@@ -1,7 +1,7 @@
 /**
  * MyLife Tracker Lovelace cards — bills/docs + education (grades / házi / órarend)
  */
-const MLTC_VERSION = "1.8.4";
+const MLTC_VERSION = "1.8.5";
 
 function mltcPickDefaultEntity(hass, pool) {
   const ids = [...new Set([
@@ -911,24 +911,20 @@ function mleduGrades(attrs) {
   return [];
 }
 
-/** Tall grade strip: theme one letter per line, type across the middle, subject + mark in the footer. */
+/** Grade row: theme and type each stay on one line; overflow is clipped. */
 function mleduGradeStrip(g, color) {
   const note = g.kind === "note";
   const sub = note
     ? (g.subject || g.value_text || g.type || "Feljegyzés")
     : (g.subject || "Értékelés");
   const val = note ? (g.value_text || g.type || "·") : (g.value_text || "—");
-  const chars = [...String(g.theme || "")].filter((ch) => ch.trim());
-  const mid = Math.ceil(chars.length / 2);
-  const letter = (ch) => `<span class="g-ch">${mleduEsc(ch)}</span>`;
-  const typeLabel = String(g.type || "").trim();
-  const typeHtml = typeLabel ? `<span class="g-type">${mleduEsc(typeLabel)}</span>` : "";
-  const letters = chars.length || typeLabel
-    ? `<div class="g-letters">${chars.slice(0, mid).map(letter).join("")}${typeHtml}${chars.slice(mid).map(letter).join("")}</div>`
-    : "";
-  const tip = [g.theme, typeLabel, sub, val].filter(Boolean).join(" · ");
+  const theme = String(g.theme || "").replace(/\s+/g, " ").trim();
+  const typeLabel = String(g.type || "").replace(/\s+/g, "").trim();
+  const themeHtml = theme ? `<div class="g-line" title="${mleduEsc(theme)}">${mleduEsc(theme)}</div>` : "";
+  const typeHtml = typeLabel ? `<div class="g-type" title="${mleduEsc(typeLabel)}">${mleduEsc(typeLabel)}</div>` : "";
+  const tip = [theme, typeLabel, sub, val].filter(Boolean).join(" · ");
   return `<div class="g-strip" style="--kid:${mleduEsc(color || "#185fa5")}" title="${mleduEsc(tip)}">
-    ${letters}
+    ${themeHtml}${typeHtml}
     <div class="g-foot">
       <span class="g-sub">${mleduEsc(sub)}</span>
       <span class="g-val">${mleduEsc(val)}</span>
@@ -1025,18 +1021,16 @@ function mleduEduStyles(dark) {
       padding: 8px 6px 8px;
       display: flex; flex-direction: column; min-width: 0;
     }
-    .g-letters {
-      display: flex; flex-direction: column; align-items: center;
-      padding: 2px 0 6px;
+    .g-line, .g-type, .g-sub {
+      min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .g-ch {
-      font-size: 14px; font-weight: 650; line-height: 1.05; text-align: center;
-      color: ${dark ? "#e6edf3" : "#1a2744"};
+    .g-line {
+      font-size: 12px; font-weight: 650; line-height: 1.25; text-align: center;
+      color: ${dark ? "#e6edf3" : "#1a2744"}; padding: 2px 0;
     }
     .g-type {
-      color: var(--kid); font-size: 12px; font-weight: 800; line-height: 1.15;
-      text-align: center; padding: 5px 2px; max-width: 100%;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      color: var(--kid); font-size: 12px; font-weight: 800; line-height: 1.25;
+      text-align: center; padding: 2px 0 4px;
     }
     .g-foot {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -1045,7 +1039,7 @@ function mleduEduStyles(dark) {
       background: ${dark ? "#161b22" : "#fff"};
     }
     .g-sub {
-      min-width: 0; font-size: 13px; font-weight: 650; line-height: 1.2;
+      font-size: 13px; font-weight: 650; line-height: 1.2;
       color: ${dark ? "#e6edf3" : "#1a2744"};
     }
     .g-val {
@@ -1392,7 +1386,7 @@ function mltcRegisterCards() {
   upsert({
     type: "mylife-edu-grades-card",
     name: "MyLife Edu Osztályzatok",
-    description: "Heti osztályzatok — függőleges sáv, tárgy és jegy alul",
+    description: "Heti osztályzatok — egy soros téma, tárgy és jegy alul",
     preview: true,
     version: MLTC_VERSION,
     documentationURL: "https://github.com/benalfoldi/mylife-tracker-card",
