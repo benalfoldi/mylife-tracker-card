@@ -1,7 +1,7 @@
 /**
  * MyLife Tracker Lovelace cards — bills/docs + education (grades / házi / órarend)
  */
-const MLTC_VERSION = "1.8.6";
+const MLTC_VERSION = "1.8.7";
 
 function mltcPickDefaultEntity(hass, pool) {
   const ids = [...new Set([
@@ -911,26 +911,24 @@ function mleduGrades(attrs) {
   return [];
 }
 
-/** Grade row: theme and type each stay on one line; overflow is clipped. */
-function mleduGradeStrip(g, color) {
+function mleduGradeParts(g) {
   const note = g.kind === "note";
   const sub = note
     ? (g.subject || g.value_text || g.type || "Feljegyzés")
     : (g.subject || "Értékelés");
-  const val = note ? (g.value_text || g.type || "·") : (g.value_text || "—");
-  const theme = String(g.theme || "").replace(/\s+/g, " ").trim();
-  const typeLabel = String(g.type || "").replace(/\s+/g, "").trim();
-  const clip = "display:block;width:100%;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;word-break:keep-all;overflow-wrap:normal";
-  const themeHtml = theme ? `<div class="g-line" title="${mleduEsc(theme)}" style="${clip};text-align:center;font-size:12px;font-weight:650;padding:2px 0">${mleduEsc(theme)}</div>` : "";
-  const typeHtml = typeLabel ? `<div class="g-type" title="${mleduEsc(typeLabel)}" style="${clip};text-align:center;font-size:12px;font-weight:800;color:var(--kid);padding:2px 0 4px">${mleduEsc(typeLabel)}</div>` : "";
-  const tip = [theme, typeLabel, sub, val].filter(Boolean).join(" · ");
-  return `<div class="g-strip" style="--kid:${mleduEsc(color || "#185fa5")};width:100%;min-width:0;overflow:hidden" title="${mleduEsc(tip)}">
-    ${themeHtml}${typeHtml}
-    <div class="g-foot">
-      <span class="g-sub">${mleduEsc(sub)}</span>
-      <span class="g-val">${mleduEsc(val)}</span>
+  const val = note ? (g.value_text || g.type || "") : (g.value_text || "—");
+  return { note, sub, val, showVal: Boolean(val) && val !== sub };
+}
+
+/** Compact row, same size as házi: subject and grade only. */
+function mleduGradeRow(g, color) {
+  const { sub, val, showVal } = mleduGradeParts(g);
+  return `<button type="button" class="hw g-hit" data-gid="${mleduEsc(g.id || "")}" style="--kid:${mleduEsc(color || "#185fa5")}">
+    <div class="hw-top">
+      <span class="sub">${mleduEsc(sub)}</span>
+      ${showVal ? `<span class="val">${mleduEsc(val)}</span>` : ""}
     </div>
-  </div>`;
+  </button>`;
 }
 
 function mleduGradesRange(attrs) {
@@ -999,6 +997,11 @@ function mleduEduStyles(dark) {
     }
     .chip-note { border-left: 2px dashed var(--kid); padding-left: 4px; }
     .hw { display: block; padding: 2px 0; }
+    button.hw {
+      cursor: pointer; border: 0; background: transparent; color: inherit;
+      font: inherit; width: 100%; text-align: left; border-radius: 5px;
+    }
+    button.hw:hover { background: color-mix(in srgb, var(--kid) 12%, transparent); }
     .sub { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; font-size: 11px; }
     .val { font-weight: 800; color: var(--kid); flex: 0 0 auto; font-size: 11px; }
     .hw-top { display: flex; justify-content: space-between; gap: 4px; align-items: baseline; }
@@ -1009,43 +1012,29 @@ function mleduEduStyles(dark) {
     }
     .empty { font-size: 10px; color: var(--muted); }
     .list { display: flex; flex-direction: column; gap: 1px; }
-    .g-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-    .g-kid {
-      font-size: 11px; font-weight: 780; color: var(--kid);
-      display: flex; align-items: center; gap: 4px; padding: 0 2px;
+    .pop-back {
+      position: fixed; inset: 0; z-index: 20;
+      background: rgba(15, 23, 42, .45);
+      display: flex; align-items: center; justify-content: center; padding: 16px;
     }
-    .g-strip {
+    .pop {
       --kid: #185fa5;
-      background: ${dark ? "#1c2230" : "#fff"};
-      border: 2px solid color-mix(in srgb, var(--kid) 58%, ${dark ? "#1c2230" : "#fff"});
-      border-radius: 16px;
-      padding: 8px 6px 8px;
-      display: flex; flex-direction: column; min-width: 0;
+      width: min(340px, 100%); max-height: min(70vh, 480px); overflow: auto;
+      background: var(--bg); color: var(--text); border-radius: 12px;
+      padding: 12px 14px 14px;
+      border-top: 3px solid var(--kid);
+      box-shadow: 0 16px 40px rgba(0,0,0,.28);
     }
-    .g-line, .g-type, .g-sub {
-      min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    .pop-top { display: flex; align-items: flex-start; gap: 8px; }
+    .pop-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 750; line-height: 1.3; }
+    .pop-x {
+      border: 0; background: transparent; color: var(--muted); cursor: pointer;
+      font-size: 18px; line-height: 1; padding: 0 2px;
     }
-    .g-line {
-      font-size: 12px; font-weight: 650; line-height: 1.25; text-align: center;
-      color: ${dark ? "#e6edf3" : "#1a2744"}; padding: 2px 0;
-    }
-    .g-type {
-      color: var(--kid); font-size: 12px; font-weight: 800; line-height: 1.25;
-      text-align: center; padding: 2px 0 4px;
-    }
-    .g-foot {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      margin-top: 4px; padding: 7px 8px; border-radius: 12px;
-      border: 1.5px solid color-mix(in srgb, var(--kid) 42%, ${dark ? "#1c2230" : "#fff"});
-      background: ${dark ? "#161b22" : "#fff"};
-    }
-    .g-sub {
-      font-size: 13px; font-weight: 650; line-height: 1.2;
-      color: ${dark ? "#e6edf3" : "#1a2744"};
-    }
-    .g-val {
-      flex: 0 0 auto; font-size: 13px; font-weight: 800; color: var(--kid); text-align: right;
-    }
+    .pop-grade { margin: 8px 0 4px; font-size: 20px; font-weight: 800; color: var(--kid); }
+    .pop-row { margin-top: 8px; }
+    .pop-k { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .pop-v { margin-top: 2px; font-size: 12px; line-height: 1.35; white-space: pre-wrap; word-break: break-word; }
     .tt-wrap { overflow-x: auto; }
     .tt-week {
       min-width: 520px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
@@ -1146,14 +1135,65 @@ class MyLifeEduCardBase extends HTMLElement {
     return students.map((s) => {
       const color = s.color || "#185fa5";
       const list = grades.filter((g) => g.student_id === s.id);
-      const strips = list.length
-        ? list.map((g) => mleduGradeStrip(g, color)).join("")
+      const items = list.length
+        ? list.map((g) => mleduGradeRow(g, color)).join("")
         : `<div class="empty">Nincs új</div>`;
-      return `<div class="g-col" style="--kid:${mleduEsc(color)}">
-        <div class="g-kid">${mleduEsc(s.name || "Gyerek")}<span class="count">${list.length}</span></div>
-        ${strips}
+      return `<div class="pane" style="--kid:${mleduEsc(color)}">
+        <div class="kidname">${mleduEsc(s.name || "Gyerek")}<span class="count">${list.length}</span></div>
+        <div class="list">${items}</div>
       </div>`;
     }).join("");
+  }
+
+  _gradePopupHtml() {
+    const id = this._openGradeId;
+    if (!id) return "";
+    const g = (this._gradeList || []).find((row) => String(row.id) === String(id));
+    if (!g) return "";
+    const kid = (this._studentMap || {})[g.student_id] || {};
+    const color = kid.color || "#185fa5";
+    const { sub, val } = mleduGradeParts(g);
+    const theme = String(g.theme || "").replace(/\s+/g, " ").trim();
+    const typeLabel = String(g.type || "").trim();
+    const when = mleduFmtDate(g.recorded_at);
+    const row = (label, text) => text
+      ? `<div class="pop-row"><div class="pop-k">${mleduEsc(label)}</div><div class="pop-v">${mleduEsc(text)}</div></div>`
+      : "";
+    return `<div class="pop-back">
+      <div class="pop" style="--kid:${mleduEsc(color)}" role="dialog" tabindex="-1">
+        <div class="pop-top">
+          <div class="pop-title">${mleduEsc(sub)}</div>
+          <button type="button" class="pop-x" aria-label="Bezár">×</button>
+        </div>
+        ${val && val !== sub ? `<div class="pop-grade">${mleduEsc(val)}</div>` : ""}
+        ${row("Típus", typeLabel && typeLabel !== val && typeLabel !== sub ? typeLabel : "")}
+        ${row("Téma", theme)}
+        ${row("Dátum", when)}
+        ${kid.name ? row("Diák", kid.name) : ""}
+      </div>
+    </div>`;
+  }
+
+  _bindGradePopup() {
+    const root = this.shadowRoot;
+    if (!root) return;
+    const close = () => {
+      this._openGradeId = "";
+      this._render();
+    };
+    root.querySelectorAll(".g-hit").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const gid = btn.getAttribute("data-gid");
+        if (!gid) return;
+        this._openGradeId = gid;
+        this._render();
+      });
+    });
+    root.querySelector(".pop")?.addEventListener("click", (ev) => ev.stopPropagation());
+    root.querySelector(".pop-back")?.addEventListener("click", close);
+    root.querySelector(".pop-x")?.addEventListener("click", close);
+    const pop = root.querySelector(".pop");
+    if (pop) pop.focus();
   }
 
   _hwPanes(students, hw) {
@@ -1191,11 +1231,15 @@ class MyLifeEduGradesCard extends MyLifeEduCardBase {
     const students = mleduStudents(attrs);
     const grades = mleduGrades(attrs);
     const range = mleduFmtRange(mleduGradesRange(attrs));
+    this._gradeList = grades;
+    this._studentMap = mleduStudentMap(attrs);
     if (!students.length) {
       this._renderShell("Heti osztályzatok", range, `<div class="empty">Nincs diák adat</div>`);
       return;
     }
-    this._renderShell("Heti osztályzatok", range, `<div class="split">${this._gradePanes(students, grades)}</div>`);
+    const popup = this._gradePopupHtml();
+    this._renderShell("Heti osztályzatok", range, `<div class="split">${this._gradePanes(students, grades)}</div>${popup}`);
+    this._bindGradePopup();
   }
 }
 
@@ -1387,7 +1431,7 @@ function mltcRegisterCards() {
   upsert({
     type: "mylife-edu-grades-card",
     name: "MyLife Edu Osztályzatok",
-    description: "Heti osztályzatok — egy soros téma, tárgy és jegy alul",
+    description: "Heti osztályzatok — tárgy és jegy, részletek kattintásra",
     preview: true,
     version: MLTC_VERSION,
     documentationURL: "https://github.com/benalfoldi/mylife-tracker-card",
