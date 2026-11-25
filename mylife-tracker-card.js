@@ -1,7 +1,7 @@
 /**
  * MyLife Tracker Lovelace cards — bills/docs + education (grades / házi / órarend)
  */
-const MLTC_VERSION = "1.8.5";
+const MLTC_VERSION = "1.8.6";
 
 function mltcPickDefaultEntity(hass, pool) {
   const ids = [...new Set([
@@ -920,10 +920,11 @@ function mleduGradeStrip(g, color) {
   const val = note ? (g.value_text || g.type || "·") : (g.value_text || "—");
   const theme = String(g.theme || "").replace(/\s+/g, " ").trim();
   const typeLabel = String(g.type || "").replace(/\s+/g, "").trim();
-  const themeHtml = theme ? `<div class="g-line" title="${mleduEsc(theme)}">${mleduEsc(theme)}</div>` : "";
-  const typeHtml = typeLabel ? `<div class="g-type" title="${mleduEsc(typeLabel)}">${mleduEsc(typeLabel)}</div>` : "";
+  const clip = "display:block;width:100%;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;word-break:keep-all;overflow-wrap:normal";
+  const themeHtml = theme ? `<div class="g-line" title="${mleduEsc(theme)}" style="${clip};text-align:center;font-size:12px;font-weight:650;padding:2px 0">${mleduEsc(theme)}</div>` : "";
+  const typeHtml = typeLabel ? `<div class="g-type" title="${mleduEsc(typeLabel)}" style="${clip};text-align:center;font-size:12px;font-weight:800;color:var(--kid);padding:2px 0 4px">${mleduEsc(typeLabel)}</div>` : "";
   const tip = [theme, typeLabel, sub, val].filter(Boolean).join(" · ");
-  return `<div class="g-strip" style="--kid:${mleduEsc(color || "#185fa5")}" title="${mleduEsc(tip)}">
+  return `<div class="g-strip" style="--kid:${mleduEsc(color || "#185fa5")};width:100%;min-width:0;overflow:hidden" title="${mleduEsc(tip)}">
     ${themeHtml}${typeHtml}
     <div class="g-foot">
       <span class="g-sub">${mleduEsc(sub)}</span>
